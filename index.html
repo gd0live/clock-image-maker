@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clock Image Maker</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #171717;
+      color: #fff;
+      font-family: Pretendard, "Noto Sans KR", system-ui, sans-serif;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      min-height: 100vh;
+    }
+
+    .panel {
+      padding: 24px;
+      background: #232323;
+      border-right: 1px solid #444;
+      overflow-y: auto;
+    }
+
+    .panel h1 {
+      margin: 0 0 20px;
+      font-size: 22px;
+    }
+
+    .field {
+      margin-bottom: 14px;
+    }
+
+    .field-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 76px;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .field-row .field {
+      margin-bottom: 14px;
+    }
+
+    .field-row .field input {
+      height: 38px;
+    }
+
+    .field-row input[type="range"] {
+      padding: 0;
+    }
+
+    .field-row input[type="color"] {
+      padding: 4px;
+    }
+
+    .check-field {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: -4px 0 14px;
+      color: #ccc;
+      font-size: 13px;
+    }
+
+    .check-field input {
+      width: auto;
+      accent-color: #f1d6a8;
+    }
+
+    .time-picker {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      align-items: end;
+      padding: 10px;
+      border: 1px solid #555;
+      border-radius: 8px;
+      background: #191919;
+    }
+
+    .time-picker span {
+      display: block;
+      margin-bottom: 5px;
+      color: #aaa;
+      font-size: 12px;
+    }
+
+    .field label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 13px;
+      color: #ccc;
+    }
+
+    .field input,
+    .field select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #555;
+      border-radius: 8px;
+      background: #111;
+      color: white;
+    }
+
+    .hint {
+      margin: -4px 0 18px;
+      color: #999;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .button {
+      width: 100%;
+      margin-top: 8px;
+      padding: 12px 14px;
+      border: 0;
+      border-radius: 10px;
+      background: #f1d6a8;
+      color: #352517;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    .button:hover {
+      background: #ffe4b7;
+    }
+
+    .preview {
+      display: grid;
+      place-items: center;
+      padding: 32px;
+    }
+
+    .canvas {
+      position: relative;
+      width: min(calc(80vw * var(--canvas-scale, 1)), calc(900px * var(--canvas-scale, 1)));
+      aspect-ratio: 1 / 1;
+      overflow: hidden;
+      background: #333;
+    }
+
+    .bg {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+
+    .bg-img {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+
+      max-width: none;
+      max-height: none;
+
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+
+      transform: translate(-50%, -50%) translate(var(--image-x), var(--image-y)) scale(var(--image-scale));
+      transform-origin: center center;
+    }
+
+    .outside-mask {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .clock {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: var(--clock-size);
+      height: var(--clock-size);
+      transform: translate(-50%, -50%);
+      z-index: 3;
+    }
+
+    .face {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: var(--ring-size);
+      height: var(--ring-size);
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+    }
+
+    .tick {
+      position: absolute;
+      transform: translate(-50%, -50%);
+    }
+
+    .hand {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform-origin: 50% 100%;
+    }
+
+    .center-dot {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 3.5%;
+      height: 3.5%;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .label-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .label-svg text {
+      font-weight: 900;
+      paint-order: stroke;
+      stroke-linejoin: round;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+
+    <aside class="panel">
+      <h1>시계 설정</h1>
+      <p class="hint">배경 그림을 넣고 시계 모양과 시간을 조절한 뒤 PNG로 저장하세요.</p>
+
+      <div class="field">
+        <label>캐릭터 이미지</label>
+        <input id="file" type="file" accept="image/*" />
+      </div>
+
+      <div class="field">
+        <label>이미지 X 위치</label>
+        <input id="imageX" type="range" min="-100" max="100" value="0" />
+      </div>
+
+      <div class="field">
+        <label>이미지 Y 위치</label>
+        <input id="imageY" type="range" min="-100" max="100" value="0" />
+      </div>
+
+      <div class="field">
+        <label>이미지 확대</label>
+        <input id="imageScale" type="range" min="30" max="500" value="100" />
+      </div>
+
+      <div class="field">
+        <label>레이블 텍스트</label>
+        <input id="labelText" type="text" value="설홍시" />
+      </div>
+
+      <div class="field">
+        <label>레이블 폰트</label>
+        <input id="labelFont" type="text" value="Pretendard, 'Noto Sans KR', sans-serif" />
+      </div>
+
+      <div class="time-picker field">
+        <label>
+          <span>시</span>
+          <select id="pickerHour"></select>
+        </label>
+        <label>
+          <span>분</span>
+          <select id="pickerMinute"></select>
+        </label>
+      </div>
+
+      <label class="check-field">
+        <input id="includeTime" type="checkbox" checked />
+        레이블 앞에 시간 표시 자동 포함
+      </label>
+
+      <div class="field">
+        <label>시계 전체 크기 · 자동 크롭</label>
+        <input id="clockSize" type="range" min="50" max="92" value="82" />
+      </div>
+
+      <div class="field">
+        <label>테마</label>
+        <select id="theme">
+          <option value="classic">Classic Ring</option>
+          <option value="double">Double Ring</option>
+          <option value="minimal">Minimal</option>
+          <option value="dot">Dot Marker</option>
+        </select>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>시계 밖 배경 투명도</label>
+          <input id="outsideOpacity" type="range" min="0" max="1" step="0.01" value="0.30" />
+        </div>
+
+        <div class="field">
+          <label>배경색</label>
+          <input id="outsideColor" type="color" value="#000000" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label>저장 이미지 크기</label>
+        <select id="exportSize">
+          <option value="1024">1024 x 1024</option>
+          <option value="1536" selected>1536 x 1536</option>
+          <option value="2048">2048 x 2048</option>
+        </select>
+      </div>
+
+      <button id="download" class="button" type="button">PNG 이미지 저장</button>
+    </aside>
+
+    <main class="preview">
+      <div id="canvas" class="canvas">
+        <div id="bg" class="bg">
+          <img id="bgImg" class="bg-img" alt="">
+        </div>
+        <div id="outsideMask" class="outside-mask"></div>
+        <div id="clock" class="clock"></div>
+      </div>
+    </main>
+
+  </div>
+
+  <script>
+    const RING_SIZE = 88;
+    const DEFAULT_CLOCK_SIZE = 96;
+
+    const state = {
+      imageUrl: "",
+      imageX: 0,
+      imageY: 0,
+      imageScale: 100,
+
+      labelText: "설홍시",
+      labelFont: "Pretendard, 'Noto Sans KR', sans-serif",
+
+      hour: 4,
+      minute: 5,
+      includeTime: true,
+
+      clockSize: 82,
+      theme: "classic",
+
+      outsideColor: "#000000",
+      outsideOpacity: 0.30
+    };
+
+    const themes = {
+      classic: {
+        color: "#fff8ec",
+        ringBorder: "10px solid #fff8ec",
+        tickType: "bar",
+        handType: "round",
+        centerDot: false
+      },
+      double: {
+        color: "#fff8ec",
+        ringBorder: "8px double #fff8ec",
+        tickType: "bar",
+        handType: "diamond",
+        centerDot: false
+      },
+      minimal: {
+        color: "#ffffff",
+        ringBorder: "4px solid #ffffff",
+        tickType: "none",
+        handType: "thin",
+        centerDot: false
+      },
+      dot: {
+        color: "#ffffff",
+        ringBorder: "8px solid #ffffff",
+        tickType: "dot",
+        handType: "taper",
+        centerDot: true
+      }
+    };
+
+    const $ = id => document.getElementById(id);
+
+    const els = {
+      file: $("file"),
+      imageX: $("imageX"),
+      imageY: $("imageY"),
+      imageScale: $("imageScale"),
+      labelText: $("labelText"),
+      labelFont: $("labelFont"),
+      pickerHour: $("pickerHour"),
+      pickerMinute: $("pickerMinute"),
+      includeTime: $("includeTime"),
+      clockSize: $("clockSize"),
+      theme: $("theme"),
+      outsideColor: $("outsideColor"),
+      outsideOpacity: $("outsideOpacity"),
+      exportSize: $("exportSize"),
+      download: $("download"),
+
+      canvas: $("canvas"),
+      bg: $("bg"),
+      bgImg: $("bgImg"),
+      outsideMask: $("outsideMask"),
+      clock: $("clock")
+    };
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, Number(value)));
+    }
+
+    function getCropScale() {
+      return clamp(state.clockSize, 50, 92) / DEFAULT_CLOCK_SIZE;
+    }
+
+    function render() {
+      const theme = themes[state.theme];
+
+      const ringSize = RING_SIZE;
+      const cropScale = getCropScale();
+
+      els.clock.innerHTML = "";
+
+      els.canvas.style.setProperty("--canvas-scale", cropScale);
+      els.clock.style.setProperty("--clock-size", `${DEFAULT_CLOCK_SIZE}%`);
+      els.clock.style.setProperty("--ring-size", `${ringSize}%`);
+      els.bg.style.backgroundImage = state.imageUrl
+        ? "none"
+        : "linear-gradient(135deg, #642020, #2d2d2d)";
+
+      els.bgImg.src = state.imageUrl;
+      els.bgImg.style.display = state.imageUrl ? "block" : "none";
+      els.bg.style.setProperty("--image-x", `${state.imageX / cropScale}px`);
+      els.bg.style.setProperty("--image-y", `${state.imageY / cropScale}px`);
+      els.bg.style.setProperty("--image-scale", (state.imageScale / 100) / cropScale);
+
+      updateOutsideMask(DEFAULT_CLOCK_SIZE, ringSize);
+
+      const face = document.createElement("div");
+      face.className = "face";
+      face.style.border = theme.ringBorder;
+      els.clock.appendChild(face);
+
+      createCurvedLabel(els.clock);
+      createTicks(face, theme);
+      createHands(face, theme);
+
+      if (theme.centerDot) {
+        createCenterDot(face, theme.color);
+      }
+    }
+
+    function updateImageControlRange() {
+      const canvasSize = document.querySelector(".canvas").getBoundingClientRect().width;
+      const renderedSize = canvasSize * (state.imageScale / 100) / getCropScale();
+      const limit = Math.round(renderedSize / 3);
+
+      els.imageX.min = -limit;
+      els.imageX.max = limit;
+
+      els.imageY.min = -limit;
+      els.imageY.max = limit;
+
+      state.imageX = Math.max(-limit, Math.min(limit, state.imageX));
+      state.imageY = Math.max(-limit, Math.min(limit, state.imageY));
+
+      els.imageX.value = state.imageX;
+      els.imageY.value = state.imageY;
+    }
+
+    function updateOutsideMask(clockSize, ringSize) {
+      const canvasSize = document.querySelector(".canvas").getBoundingClientRect().width;
+      const radius = canvasSize * (clockSize / 100) * (ringSize / 100) / 2;
+      const centerX = canvasSize / 2;
+      const centerY = canvasSize / 2;
+
+      els.outsideMask.style.background = state.outsideColor;
+      els.outsideMask.style.opacity = state.outsideOpacity;
+
+      els.outsideMask.style.mask = `
+        radial-gradient(
+          circle ${radius}px at ${centerX}px ${centerY}px,
+          transparent 0 ${radius}px,
+          black ${radius + 1}px
+        )
+      `;
+
+      els.outsideMask.style.webkitMask = els.outsideMask.style.mask;
+    }
+
+    function createCurvedLabel(parent) {
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+
+      svg.classList.add("label-svg");
+      svg.setAttribute("viewBox", "0 0 100 100");
+
+      svg.innerHTML = `
+    <defs>
+      <path id="labelPath" d="M 8.5 50 A 41.5 41.5 0 0 1 91.5 50" />
+    </defs>
+
+    <text
+      font-family="${escapeAttr(state.labelFont)}"
+      font-size="6.2"
+      fill="white"
+      stroke="#5a321f"
+      stroke-width="1.25">
+      <textPath
+        href="#labelPath"
+        startOffset="50%"
+        text-anchor="middle">
+        ${escapeHTML(getLabelText())}
+      </textPath>
+    </text>
+  `;
+
+      parent.appendChild(svg);
+    }
+
+    function createTicks(parent, theme) {
+      if (theme.tickType === "none") return;
+
+      const radius = 43;
+
+      for (let i = 0; i < 12; i++) {
+        const angle = i * 30;
+        const rad = angle * Math.PI / 180;
+
+        const tick = document.createElement("div");
+        tick.className = "tick";
+
+        tick.style.left = `${50 + Math.sin(rad) * radius}%`;
+        tick.style.top = `${50 - Math.cos(rad) * radius}%`;
+        tick.style.background = theme.color;
+
+        if (theme.tickType === "bar") {
+          tick.style.width = "1.5%";
+          tick.style.height = "7%";
+          tick.style.borderRadius = "999px";
+          tick.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
+        }
+
+        if (theme.tickType === "dot") {
+          tick.style.width = "2.8%";
+          tick.style.height = "2.8%";
+          tick.style.borderRadius = "50%";
+          tick.style.transform = "translate(-50%, -50%)";
+        }
+
+        parent.appendChild(tick);
+      }
+    }
+
+    function createHands(parent, theme) {
+      const hourAngle = ((state.hour % 12) * 30) + (state.minute * 0.5);
+      const minuteAngle = state.minute * 6;
+
+      createHand(parent, "hour", hourAngle, 27, theme);
+      createHand(parent, "minute", minuteAngle, 36, theme);
+    }
+
+    function createHand(parent, name, angle, length, theme) {
+      const hand = document.createElement("div");
+      hand.className = `hand ${name}`;
+      hand.style.height = `${length}%`;
+      hand.style.background = theme.color;
+      hand.style.transform = `translate(-50%, -100%) rotate(${angle}deg)`;
+
+      if (theme.handType === "round") {
+        hand.style.width = name === "hour" ? "2.5%" : "1.5%";
+        hand.style.borderRadius = "999px";
+      }
+
+      if (theme.handType === "diamond") {
+        hand.style.width = name === "hour" ? "3.2%" : "2.1%";
+        hand.style.clipPath = "polygon(50% 0%, 100% 88%, 50% 100%, 0% 88%)";
+      }
+
+      if (theme.handType === "thin") {
+        hand.style.width = name === "hour" ? "1.1%" : "0.75%";
+        hand.style.borderRadius = "999px";
+      }
+
+      if (theme.handType === "taper") {
+        hand.style.width = name === "hour" ? "2.8%" : "1.8%";
+        hand.style.clipPath = "polygon(50% 0%, 82% 100%, 18% 100%)";
+      }
+
+      parent.appendChild(hand);
+    }
+
+    function createCenterDot(parent, color) {
+      const dot = document.createElement("div");
+      dot.className = "center-dot";
+      dot.style.background = color;
+      parent.appendChild(dot);
+    }
+
+    function escapeHTML(value) {
+      return String(value).replace(/[&<>"']/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+      })[char]);
+    }
+
+    function escapeAttr(value) {
+      return escapeHTML(value).replace(/`/g, "&#096;");
+    }
+
+    function bindControls() {
+      els.file.addEventListener("change", event => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.addEventListener("load", () => {
+          state.imageUrl = reader.result;
+          render();
+        });
+        reader.readAsDataURL(file);
+      });
+
+      populateTimePicker();
+
+      [els.pickerHour, els.pickerMinute].forEach(select => {
+        select.addEventListener("input", () => {
+          state.hour = Number(els.pickerHour.value);
+          state.minute = Number(els.pickerMinute.value);
+          render();
+        });
+      });
+
+      els.includeTime.addEventListener("change", event => {
+        state.includeTime = event.target.checked;
+        render();
+      });
+
+      const bindings = [
+        ["imageX", "number"],
+        ["imageY", "number"],
+        ["imageScale", "number"],
+        ["labelText", "text"],
+        ["labelFont", "text"],
+        ["clockSize", "number"],
+        ["theme", "text"],
+        ["outsideColor", "text"],
+        ["outsideOpacity", "number"]
+      ];
+
+      bindings.forEach(([key, type]) => {
+        els[key].addEventListener("input", event => {
+          state[key] = type === "number"
+            ? Number(event.target.value)
+            : event.target.value;
+
+          state.clockSize = clamp(state.clockSize, 50, 92);
+
+          render();
+
+          // 확대나 크롭 범위가 바뀌면 이동범위 재계산
+          if (key === "imageScale" || key === "clockSize") {
+            updateImageControlRange();
+            render();
+          }
+        });
+      });
+
+      els.download.addEventListener("click", downloadPng);
+    }
+
+    async function downloadPng() {
+      const size = Number(els.exportSize.value);
+      const output = document.createElement("canvas");
+      output.width = size;
+      output.height = size;
+
+      const context = output.getContext("2d");
+      const theme = themes[state.theme];
+      const screenSize = $("canvas").getBoundingClientRect().width || size;
+      const scale = size / screenSize;
+      const centerX = size / 2;
+      const centerY = size / 2;
+      const clockDiameter = size * (DEFAULT_CLOCK_SIZE / 100);
+      const ringRadius = clockDiameter * (RING_SIZE / 100) / 2;
+
+      drawExportBackground(context, size, scale);
+      drawExportOutsideMask(context, size, centerX, centerY, ringRadius);
+      drawExportRing(context, theme, centerX, centerY, ringRadius, size);
+      drawExportTicks(context, theme, centerX, centerY, ringRadius, size);
+      drawExportHands(context, theme, centerX, centerY, ringRadius, size);
+      drawExportLabel(context, centerX, centerY, clockDiameter, size);
+
+      const link = document.createElement("a");
+      link.download = `clock-${String(state.hour).padStart(2, "0")}-${String(state.minute).padStart(2, "0")}.png`;
+      link.href = output.toDataURL("image/png");
+      link.click();
+    }
+
+    function drawExportBackground(context, size, scale) {
+      if (!state.imageUrl || !els.bgImg.complete || !els.bgImg.naturalWidth) {
+        const gradient = context.createLinearGradient(0, 0, size, size);
+        gradient.addColorStop(0, "#642020");
+        gradient.addColorStop(1, "#2d2d2d");
+        context.fillStyle = gradient;
+        context.fillRect(0, 0, size, size);
+        return;
+      }
+
+      const image = els.bgImg;
+      const coverScale = Math.max(size / image.naturalWidth, size / image.naturalHeight);
+      const cropScale = getCropScale();
+      const imageScale = coverScale * (state.imageScale / 100) / cropScale;
+      const width = image.naturalWidth * imageScale;
+      const height = image.naturalHeight * imageScale;
+      const x = ((size - width) / 2) + ((state.imageX * scale) / cropScale);
+      const y = ((size - height) / 2) + ((state.imageY * scale) / cropScale);
+
+      context.drawImage(image, x, y, width, height);
+    }
+
+    function drawExportOutsideMask(context, size, centerX, centerY, radius) {
+      context.save();
+      context.fillStyle = state.outsideColor;
+      context.globalAlpha = state.outsideOpacity;
+      context.beginPath();
+      context.rect(0, 0, size, size);
+      context.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      context.fill("evenodd");
+      context.restore();
+    }
+
+    function drawExportRing(context, theme, centerX, centerY, radius, size) {
+      context.save();
+      context.strokeStyle = theme.color;
+      context.lineWidth = size * (theme.ringBorder.startsWith("4px") ? 0.004 : 0.009);
+      context.beginPath();
+      context.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      context.stroke();
+
+      if (theme.ringBorder.includes("double")) {
+        context.lineWidth = size * 0.003;
+        context.beginPath();
+        context.arc(centerX, centerY, radius - (size * 0.009), 0, Math.PI * 2);
+        context.stroke();
+      }
+      context.restore();
+    }
+
+    function drawExportTicks(context, theme, centerX, centerY, radius, size) {
+      if (theme.tickType === "none") return;
+
+      context.save();
+      context.strokeStyle = theme.color;
+      context.fillStyle = theme.color;
+      context.lineCap = "round";
+
+      for (let i = 0; i < 12; i++) {
+        const angle = (i * 30 - 90) * Math.PI / 180;
+        const outerRadius = radius * 0.92;
+
+        if (theme.tickType === "dot") {
+          context.beginPath();
+          context.arc(
+            centerX + Math.cos(angle) * outerRadius,
+            centerY + Math.sin(angle) * outerRadius,
+            size * 0.011,
+            0,
+            Math.PI * 2
+          );
+          context.fill();
+          continue;
+        }
+
+        context.lineWidth = size * 0.012;
+        context.beginPath();
+        context.moveTo(
+          centerX + Math.cos(angle) * outerRadius,
+          centerY + Math.sin(angle) * outerRadius
+        );
+        context.lineTo(
+          centerX + Math.cos(angle) * (outerRadius - radius * 0.10),
+          centerY + Math.sin(angle) * (outerRadius - radius * 0.10)
+        );
+        context.stroke();
+      }
+      context.restore();
+    }
+
+    function drawExportHands(context, theme, centerX, centerY, radius, size) {
+      const hourAngle = (((state.hour % 12) * 30) + (state.minute * 0.5) - 90) * Math.PI / 180;
+      const minuteAngle = ((state.minute * 6) - 90) * Math.PI / 180;
+
+      drawExportHand(context, theme, centerX, centerY, radius * 0.54, hourAngle, size * 0.018);
+      drawExportHand(context, theme, centerX, centerY, radius * 0.72, minuteAngle, size * 0.012);
+
+      context.save();
+      context.fillStyle = theme.color;
+      context.beginPath();
+      context.arc(centerX, centerY, size * 0.015, 0, Math.PI * 2);
+      context.fill();
+      context.restore();
+    }
+
+    function drawExportHand(context, theme, centerX, centerY, length, angle, width) {
+      context.save();
+      context.strokeStyle = theme.color;
+      context.lineWidth = width;
+      context.lineCap = theme.handType === "thin" ? "butt" : "round";
+      context.beginPath();
+      context.moveTo(centerX, centerY);
+      context.lineTo(centerX + Math.cos(angle) * length, centerY + Math.sin(angle) * length);
+      context.stroke();
+      context.restore();
+    }
+
+    function drawExportLabel(context, centerX, centerY, clockDiameter, size) {
+      const text = getLabelText();
+      const fontSize = clockDiameter * 0.062;
+      const radius = clockDiameter * 0.415;
+      const centerAngle = -Math.PI / 2;
+
+      context.save();
+      context.font = `900 ${fontSize}px ${state.labelFont}`;
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.lineJoin = "round";
+      context.strokeStyle = "#5a321f";
+      context.lineWidth = size * 0.010;
+      context.fillStyle = "white";
+
+      const correctedWidths = Array.from(text, char => context.measureText(char).width);
+      const totalAngle = correctedWidths.reduce((sum, width) => sum + width / radius, 0);
+      let angle = centerAngle - (totalAngle / 2);
+
+      Array.from(text).forEach((char, index) => {
+        const charAngle = correctedWidths[index] / radius;
+        angle += charAngle / 2;
+        context.save();
+        context.translate(
+          centerX + Math.cos(angle) * radius,
+          centerY + Math.sin(angle) * radius
+        );
+        context.rotate(angle + Math.PI / 2);
+        context.strokeText(char, 0, 0);
+        context.fillText(char, 0, 0);
+        context.restore();
+        angle += charAngle / 2;
+      });
+
+      context.restore();
+    }
+
+    function getLabelText() {
+      if (!state.includeTime) return state.labelText;
+      return `${formatTime()} ${state.labelText}`;
+    }
+
+    function populateTimePicker() {
+      els.pickerHour.innerHTML = Array.from(
+        { length: 12 },
+        (_, index) => {
+          const hour = index + 1;
+          return `<option value="${hour}">${String(hour).padStart(2, "0")}</option>`;
+        }
+      ).join("");
+
+      els.pickerMinute.innerHTML = Array.from(
+        { length: 60 },
+        (_, minute) => `<option value="${minute}">${String(minute).padStart(2, "0")}</option>`
+      ).join("");
+
+      els.pickerHour.value = state.hour;
+      els.pickerMinute.value = state.minute;
+    }
+
+    function formatTime() {
+      return `${String(state.hour).padStart(2, "0")}:${String(state.minute).padStart(2, "0")}`;
+    }
+
+    updateImageControlRange();
+    bindControls();
+    render();
+  </script>
+</body>
+
+</html>
