@@ -108,19 +108,21 @@
 
     .field-row {
       display: grid;
-      grid-template-columns: 1fr 40px;
-      gap: 15px;
+      grid-template-columns: minmax(0, 1fr) 48px;
+      gap: 8px;
       align-items: start;
+      margin-bottom: 10px;
     }
 
     .field-row .field {
       display: flex;
       flex-direction: column;
       gap: 4px;
+      margin-bottom: 0;
     }
 
     .field-row .field label {
-      font-size: 11px;
+      font-size: 12px;
       color: #ccc;
       margin: 0;
     }
@@ -130,7 +132,23 @@
     }
 
     .field-row .field input[type="color"] {
-      width: 50px;
+      width: 100%;
+    }
+
+    .background-row .field {
+      display: grid;
+      grid-template-rows: 16px 32px;
+      gap: 4px;
+    }
+
+    .background-row .field input[type="range"] {
+      align-self: center;
+      margin: 0;
+    }
+
+    .background-row .field input[type="color"] {
+      align-self: center;
+      height: 32px;
     }
 
     .range-row {
@@ -148,8 +166,8 @@
 
     input[type="color"] {
       appearance: none;
-      width: 28px;
-      height: 28px;
+      width: 32px;
+      height: 32px;
       padding: 0;
       border: 1px solid #555;
       border-radius: 4px;
@@ -196,7 +214,7 @@
 
     .label-toolbar {
       display: grid;
-      grid-template-columns: 60px repeat(6, 30px);
+      grid-template-columns: 60px repeat(6, 32px);
       gap: 6px;
       align-items: end;
       margin-bottom: 10px;
@@ -211,8 +229,8 @@
       display: block;
       margin-bottom: 4px;
       overflow: hidden;
-      color: #aaa;
-      font-size: 10px;
+      color: #ccc;
+      font-size: 11px;
       text-align: center;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -223,7 +241,7 @@
     .format-toggle {
       display: block;
       width: 100%;
-      height: 28px;
+      height: 32px;
       padding: 0;
       border: 1px solid #555;
       border-radius: 5px;
@@ -260,7 +278,7 @@
 
     .time-picker {
       display: grid;
-      grid-template-columns: 1fr 1fr auto;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 48px;
       gap: 8px;
       align-items: end;
       padding: 0;
@@ -271,7 +289,7 @@
     .time-picker span {
       display: block;
       margin-bottom: 4px;
-      color: #aaa;
+      color: #ccc;
       font-size: 12px;
     }
 
@@ -282,14 +300,22 @@
       color: #ccc;
     }
 
-    .field input,
+    .field input:not([type="range"]),
     .field select {
       width: 100%;
-      padding: 7px 8px;
+      height: 32px;
+      padding: 6px 8px;
       border: 1px solid #555;
       border-radius: 6px;
       background: #111;
       color: white;
+    }
+
+    .field input[type="file"] {
+      height: 40px;
+      padding: 0 8px;
+      font-size: 12px;
+      line-height: 38px;
     }
 
     .hint {
@@ -302,8 +328,9 @@
 
     .button {
       width: 100%;
+      height: 32px;
       margin-top: 4px;
-      padding: 10px 12px;
+      padding: 6px 12px;
       border: 0;
       border-radius: 10px;
       background: #f1d6a8;
@@ -315,6 +342,11 @@
 
     .button:hover {
       background: #ffe4b7;
+    }
+
+    .button:disabled {
+      cursor: not-allowed;
+      opacity: 0.35;
     }
 
     .button-secondary {
@@ -329,8 +361,8 @@
 
     .save-row {
       display: grid;
-      gap: 6px;
-      margin-top: 6px;
+      gap: 8px;
+      margin-top: 8px;
     }
 
     .save-output {
@@ -339,11 +371,12 @@
     }
 
     .save-tools {
-      grid-template-columns: 34px 34px minmax(0, 1fr);
+      grid-template-columns: 32px 32px 32px 32px minmax(0, 1fr);
+      align-items: center;
     }
 
     .save-row .button {
-      height: 34px;
+      height: 32px;
       margin-top: 0;
       padding: 6px;
       font-size: 13px;
@@ -366,13 +399,14 @@
     }
 
     .slot-tools {
-      grid-template-columns: minmax(0, 1fr) 34px 34px 34px;
+      grid-template-columns: minmax(0, 1fr) 32px 32px 32px;
+      align-items: center;
     }
 
     .save-row select {
       width: 100%;
-      height: 34px;
-      padding: 7px 8px;
+      height: 32px;
+      padding: 6px 8px;
       border: 1px solid #555;
       border-radius: 6px;
       background: #111;
@@ -556,6 +590,20 @@
           </button>
         </div>
         <div class="save-row save-tools">
+          <button id="undo" class="button button-secondary icon-button" type="button" title="실행취소"
+            aria-label="실행취소" disabled>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M9 7 4 12l5 5" />
+              <path d="M5 12h9a6 6 0 0 1 6 6" />
+            </svg>
+          </button>
+          <button id="redo" class="button button-secondary icon-button" type="button" title="다시실행"
+            aria-label="다시실행" disabled>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m15 7 5 5-5 5" />
+              <path d="M19 12h-9a6 6 0 0 0-6 6" />
+            </svg>
+          </button>
           <button id="exportSettings" class="button button-secondary icon-button" type="button" title="설정 JSON 다운로드"
             aria-label="설정 JSON 다운로드">
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -628,17 +676,24 @@
           </label>
         </div>
 
-        <div class="field">
-          <label>테마</label>
-          <select id="theme">
-            <option value="classic">Classic Ring</option>
-            <option value="double">Double Ring</option>
-            <option value="minimal">Minimal</option>
-            <option value="dot">Dot Marker</option>
-          </select>
+        <div class="field-row">
+          <div class="field">
+            <label>테마</label>
+            <select id="theme">
+              <option value="classic">Classic Ring</option>
+              <option value="double">Double Ring</option>
+              <option value="minimal">Minimal</option>
+              <option value="dot">Dot Marker</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>색상</label>
+            <input id="clockColor" type="color" value="#fff8ec" />
+          </div>
         </div>
 
-        <div class="field-row">
+        <div class="field-row background-row">
           <div class="field">
             <label>배경 투명도</label>
             <input id="outsideOpacity" type="range" min="0" max="1" step="0.01" value="0.30" />
@@ -755,6 +810,7 @@
     const RING_SIZE = 88;
     const DEFAULT_CLOCK_SIZE = 96;
     const CLOCK_CENTER_Y = 54;
+    const HISTORY_LIMIT = 30;
     const DB_NAME = "clock-image-maker";
     const DB_STORE = "settings";
     const DB_KEY = "current";
@@ -785,6 +841,7 @@
         includeTime: true,
 
         theme: "classic",
+        clockColor: "#fff8ec",
 
         outsideColor: "#000000",
         outsideOpacity: 0.30
@@ -792,6 +849,10 @@
     }
 
     const state = createDefaultState();
+    const undoStack = [];
+    const redoStack = [];
+    let pendingHistorySnapshot = null;
+    let pendingHistoryCommitted = false;
 
     const themes = {
       classic: {
@@ -853,10 +914,13 @@
       pickerMinute: $("pickerMinute"),
       includeTime: $("includeTime"),
       theme: $("theme"),
+      clockColor: $("clockColor"),
       outsideColor: $("outsideColor"),
       outsideOpacity: $("outsideOpacity"),
       exportSize: $("exportSize"),
       download: $("download"),
+      undo: $("undo"),
+      redo: $("redo"),
       exportSettings: $("exportSettings"),
       importSettings: $("importSettings"),
       importSettingsFile: $("importSettingsFile"),
@@ -931,6 +995,92 @@
       } catch (error) {
         console.warn("설정 캐시를 저장하지 못했습니다.", error);
       }
+    }
+
+    function cloneSettingsSnapshot() {
+      return JSON.parse(JSON.stringify(state));
+    }
+
+    function snapshotsEqual(a, b) {
+      return JSON.stringify(a) === JSON.stringify(b);
+    }
+
+    function updateHistoryButtons() {
+      els.undo.disabled = undoStack.length === 0;
+      els.redo.disabled = redoStack.length === 0;
+    }
+
+    function pushUndoSnapshot(snapshot = cloneSettingsSnapshot()) {
+      const last = undoStack[undoStack.length - 1];
+      if (!last || !snapshotsEqual(last, snapshot)) {
+        undoStack.push(snapshot);
+      }
+
+      if (undoStack.length > HISTORY_LIMIT) {
+        undoStack.shift();
+      }
+
+      redoStack.length = 0;
+      updateHistoryButtons();
+    }
+
+    function beginHistoryChange() {
+      if (!pendingHistorySnapshot) {
+        pendingHistorySnapshot = cloneSettingsSnapshot();
+        pendingHistoryCommitted = false;
+      }
+    }
+
+    function recordPendingHistoryChange() {
+      if (
+        pendingHistorySnapshot &&
+        !pendingHistoryCommitted &&
+        !snapshotsEqual(pendingHistorySnapshot, state)
+      ) {
+        pushUndoSnapshot(pendingHistorySnapshot);
+        pendingHistoryCommitted = true;
+      }
+    }
+
+    function commitHistoryChange() {
+      if (!pendingHistorySnapshot) return;
+
+      const snapshot = pendingHistorySnapshot;
+      pendingHistorySnapshot = null;
+      if (!pendingHistoryCommitted && !snapshotsEqual(snapshot, state)) {
+        pushUndoSnapshot(snapshot);
+      }
+      pendingHistoryCommitted = false;
+    }
+
+    async function applySettingsSnapshot(snapshot) {
+      Object.assign(state, createDefaultState(), snapshot);
+      state.labelGap = clamp(state.labelGap, -3, 3);
+      els.file.value = "";
+      syncControlsFromState();
+      populateTimePicker();
+      updateImageControlRange();
+      render();
+      await saveSettings();
+      updateHistoryButtons();
+    }
+
+    async function undoSettings() {
+      commitHistoryChange();
+      if (undoStack.length === 0) return;
+
+      redoStack.push(cloneSettingsSnapshot());
+      const previous = undoStack.pop();
+      await applySettingsSnapshot(previous);
+    }
+
+    async function redoSettings() {
+      commitHistoryChange();
+      if (redoStack.length === 0) return;
+
+      undoStack.push(cloneSettingsSnapshot());
+      const next = redoStack.pop();
+      await applySettingsSnapshot(next);
     }
 
     async function clearSettings() {
@@ -1021,6 +1171,7 @@
           return;
         }
 
+        pushUndoSnapshot();
         Object.assign(state, createDefaultState(), cached);
         state.labelGap = clamp(state.labelGap, -3, 3);
         syncControlsFromState();
@@ -1061,6 +1212,7 @@
       );
       if (!shouldReset) return;
 
+      pushUndoSnapshot();
       await clearSettings();
       Object.assign(state, createDefaultState());
       els.file.value = "";
@@ -1104,6 +1256,7 @@
             throw new Error("지원하지 않는 설정 파일입니다.");
           }
 
+          pushUndoSnapshot();
           Object.assign(state, createDefaultState(), payload.settings);
           syncControlsFromState();
           populateTimePicker();
@@ -1139,6 +1292,7 @@
         "labelGap",
         "labelOffset",
         "theme",
+        "clockColor",
         "outsideColor",
         "outsideOpacity"
       ].forEach(key => {
@@ -1183,6 +1337,14 @@
       button.setAttribute("aria-pressed", String(isActive));
     }
 
+    function getClockColor() {
+      return state.clockColor || themes[state.theme].color;
+    }
+
+    function getRingBorder(theme) {
+      return theme.ringBorder.replace(/#[0-9a-fA-F]{6}/g, getClockColor());
+    }
+
     function render() {
       const theme = themes[state.theme];
 
@@ -1206,7 +1368,7 @@
 
       const face = document.createElement("div");
       face.className = "face";
-      face.style.border = theme.ringBorder;
+      face.style.border = getRingBorder(theme);
       els.clock.appendChild(face);
 
       createCurvedLabel(els.clock);
@@ -1214,7 +1376,7 @@
       createHands(face, theme);
 
       if (theme.centerDot) {
-        createCenterDot(face, theme.color);
+        createCenterDot(face, getClockColor());
       }
     }
 
@@ -1261,6 +1423,7 @@
       els.canvas.addEventListener("pointerdown", event => {
         if (!state.imageUrl) return;
 
+        beginHistoryChange();
         drag = {
           startX: event.clientX,
           startY: event.clientY,
@@ -1284,6 +1447,7 @@
         clampImagePosition();
         syncImagePositionControls();
         render();
+        recordPendingHistoryChange();
       });
 
       function endDrag(event) {
@@ -1294,6 +1458,7 @@
         if (els.canvas.hasPointerCapture(event.pointerId)) {
           els.canvas.releasePointerCapture(event.pointerId);
         }
+        commitHistoryChange();
         saveSettings();
       }
 
@@ -1303,6 +1468,7 @@
         if (!drag) return;
         drag = null;
         els.canvas.classList.remove("is-dragging");
+        commitHistoryChange();
         saveSettings();
       });
     }
@@ -1374,7 +1540,7 @@
 
         tick.style.left = `${50 + Math.sin(rad) * radius}%`;
         tick.style.top = `${50 - Math.cos(rad) * radius}%`;
-        tick.style.background = theme.color;
+        tick.style.background = getClockColor();
 
         if (theme.tickType === "bar") {
           tick.style.width = "1.5%";
@@ -1406,7 +1572,7 @@
       const hand = document.createElement("div");
       hand.className = `hand ${name}`;
       hand.style.height = `${length}%`;
-      hand.style.background = theme.color;
+      hand.style.background = getClockColor();
       hand.style.transform = `translate(-50%, -100%) rotate(${angle}deg)`;
 
       if (theme.handType === "round") {
@@ -1460,6 +1626,7 @@
 
         const reader = new FileReader();
         reader.addEventListener("load", () => {
+          pushUndoSnapshot();
           state.imageUrl = reader.result;
           render();
           saveSettings();
@@ -1471,6 +1638,7 @@
 
       [els.pickerHour, els.pickerMinute].forEach(select => {
         select.addEventListener("input", () => {
+          pushUndoSnapshot();
           state.hour = Number(els.pickerHour.value);
           state.minute = Number(els.pickerMinute.value);
           render();
@@ -1479,6 +1647,7 @@
       });
 
       els.fontPreset.addEventListener("input", event => {
+        pushUndoSnapshot();
         state.fontPreset = event.target.value;
         updateCustomFontVisibility();
         render();
@@ -1493,6 +1662,7 @@
         [els.labelStrokeNone, "labelStrokeNone"]
       ].forEach(([button, key]) => {
         button.addEventListener("click", () => {
+          pushUndoSnapshot();
           state[key] = !state[key];
           updateFormatToggle(button, state[key]);
           render();
@@ -1512,17 +1682,23 @@
         ["labelGap", "number"],
         ["labelOffset", "number"],
         ["theme", "text"],
+        ["clockColor", "text"],
         ["outsideColor", "text"],
         ["outsideOpacity", "number"]
       ];
 
       bindings.forEach(([key, type]) => {
+        els[key].addEventListener("focus", beginHistoryChange);
+        els[key].addEventListener("pointerdown", beginHistoryChange);
+        els[key].addEventListener("change", commitHistoryChange);
         els[key].addEventListener("input", event => {
+          beginHistoryChange();
           state[key] = type === "number"
             ? Number(event.target.value)
             : event.target.value;
 
           render();
+          recordPendingHistoryChange();
 
           // 확대가 바뀌면 이동범위 재계산
           if (key === "imageScale") {
@@ -1535,6 +1711,8 @@
       });
 
       els.download.addEventListener("click", downloadPng);
+      els.undo.addEventListener("click", undoSettings);
+      els.redo.addEventListener("click", redoSettings);
       els.exportSettings.addEventListener("click", exportSettingsJson);
       els.importSettings.addEventListener("click", () => els.importSettingsFile.click());
       els.importSettingsFile.addEventListener("change", event => {
@@ -1646,8 +1824,10 @@
     }
 
     function drawExportRing(context, theme, centerX, centerY, radius, size) {
+      const color = getClockColor();
+
       context.save();
-      context.strokeStyle = theme.color;
+      context.strokeStyle = color;
       context.lineWidth = size * (theme.ringBorder.startsWith("4px") ? 0.004 : 0.009);
       context.beginPath();
       context.arc(centerX, centerY, radius, 0, Math.PI * 2);
@@ -1665,9 +1845,11 @@
     function drawExportTicks(context, theme, centerX, centerY, radius, size) {
       if (theme.tickType === "none") return;
 
+      const color = getClockColor();
+
       context.save();
-      context.strokeStyle = theme.color;
-      context.fillStyle = theme.color;
+      context.strokeStyle = color;
+      context.fillStyle = color;
       context.lineCap = "round";
 
       for (let i = 0; i < 12; i++) {
@@ -1710,7 +1892,7 @@
       drawExportHand(context, theme, centerX, centerY, radius * 0.72, minuteAngle, size * 0.012);
 
       context.save();
-      context.fillStyle = theme.color;
+      context.fillStyle = getClockColor();
       context.beginPath();
       context.arc(centerX, centerY, size * 0.015, 0, Math.PI * 2);
       context.fill();
@@ -1719,7 +1901,7 @@
 
     function drawExportHand(context, theme, centerX, centerY, length, angle, width) {
       context.save();
-      context.strokeStyle = theme.color;
+      context.strokeStyle = getClockColor();
       context.lineWidth = width;
       context.lineCap = theme.handType === "thin" ? "butt" : "round";
       context.beginPath();
@@ -1808,6 +1990,7 @@
       updateImageControlRange();
       bindControls();
       render();
+      updateHistoryButtons();
     }
 
     initialize();
