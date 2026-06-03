@@ -43,6 +43,18 @@
       font-size: 20px;
     }
 
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
     .section {
       margin-top: 15px;
       padding-top: 13px;
@@ -71,6 +83,10 @@
     }
 
     .section-clock {
+      order: 4;
+    }
+
+    .section-text {
       order: 3;
     }
 
@@ -311,25 +327,35 @@
       background: #333;
     }
 
-    .save-tools {
+    .save-row {
       display: grid;
-      grid-template-columns: 34px 34px minmax(0, 1fr);
       gap: 6px;
       margin-top: 6px;
     }
 
-    .save-tools .button {
+    .save-output {
+      grid-template-columns: minmax(0, 1fr) 112px;
+      align-items: end;
+    }
+
+    .save-tools {
+      grid-template-columns: 34px 34px minmax(0, 1fr);
+    }
+
+    .save-row .button {
       height: 34px;
       margin-top: 0;
       padding: 6px;
       font-size: 13px;
     }
 
-    .save-tools .icon-button {
+    .save-tools .icon-button,
+    .slot-tools .icon-button {
       line-height: 1;
     }
 
-    .save-tools .icon-button svg {
+    .save-tools .icon-button svg,
+    .slot-tools .icon-button svg {
       width: 17px;
       height: 17px;
       fill: none;
@@ -337,6 +363,20 @@
       stroke-linecap: round;
       stroke-linejoin: round;
       stroke-width: 1.8;
+    }
+
+    .slot-tools {
+      grid-template-columns: minmax(0, 1fr) 34px 34px 34px;
+    }
+
+    .save-row select {
+      width: 100%;
+      height: 34px;
+      padding: 7px 8px;
+      border: 1px solid #555;
+      border-radius: 6px;
+      background: #111;
+      color: #fff;
     }
 
     .preview {
@@ -351,6 +391,13 @@
       aspect-ratio: 1 / 1;
       overflow: hidden;
       background: #333;
+      cursor: grab;
+      user-select: none;
+      touch-action: none;
+    }
+
+    .canvas.is-dragging {
+      cursor: grabbing;
     }
 
     .bg {
@@ -373,6 +420,9 @@
 
       transform: translate(-50%, -50%) translate(var(--image-x), var(--image-y)) scale(var(--image-scale));
       transform-origin: center center;
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-drag: none;
     }
 
     .outside-mask {
@@ -390,6 +440,7 @@
       height: var(--clock-size);
       transform: translate(-50%, -50%);
       z-index: 3;
+      pointer-events: none;
     }
 
     .face {
@@ -451,29 +502,72 @@
       <section class="section section-save">
         <h2>저장</h2>
 
-        <div class="field">
-          <label>이미지 크기</label>
-          <select id="exportSize">
-            <option value="1024">1024 x 1024</option>
-            <option value="1536" selected>1536 x 1536</option>
-            <option value="2048">2048 x 2048</option>
-          </select>
+        <div class="save-row save-output">
+          <label>
+            <span class="sr-only">이미지 크기</span>
+            <select id="exportSize">
+              <option value="1024">1024 x 1024</option>
+              <option value="1536" selected>1536 x 1536</option>
+              <option value="2048">2048 x 2048</option>
+            </select>
+          </label>
+          <button id="download" class="button" type="button">PNG 저장</button>
         </div>
 
-        <button id="download" class="button" type="button">PNG 이미지 저장</button>
-        <div class="save-tools">
-          <button id="exportSettings" class="button button-secondary icon-button" type="button" title="설정 JSON 저장"
-            aria-label="설정 JSON 저장">
+        <div class="save-row slot-tools">
+          <select id="slotSelect" title="브라우저 저장 슬롯">
+            <option value="1">슬롯 1</option>
+            <option value="2">슬롯 2</option>
+            <option value="3">슬롯 3</option>
+            <option value="4">슬롯 4</option>
+            <option value="5">슬롯 5</option>
+          </select>
+          <button
+            id="saveSlot"
+            class="button button-secondary icon-button"
+            type="button"
+            title="선택 슬롯에 저장"
+            aria-label="선택 슬롯에 저장">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M5 4h12l2 2v14H5z" />
               <path d="M8 4v6h8V4M8 20v-6h8v6" />
             </svg>
           </button>
-          <button id="importSettings" class="button button-secondary icon-button" type="button" title="설정 JSON 불러오기"
-            aria-label="설정 JSON 불러오기">
+          <button
+            id="loadSlot"
+            class="button button-secondary icon-button"
+            type="button"
+            title="선택 슬롯 불러오기"
+            aria-label="선택 슬롯 불러오기">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M3 19V6h7l2 3h9v10z" />
               <path d="m9 14 3-3 3 3M12 11v6" />
+            </svg>
+          </button>
+          <button
+            id="clearSlot"
+            class="button button-secondary icon-button"
+            type="button"
+            title="선택 슬롯 초기화"
+            aria-label="선택 슬롯 초기화">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 7h16M10 11v6M14 11v6M6 7l1 14h10l1-14M9 7V4h6v3" />
+            </svg>
+          </button>
+        </div>
+        <div class="save-row save-tools">
+          <button id="exportSettings" class="button button-secondary icon-button" type="button" title="설정 JSON 다운로드"
+            aria-label="설정 JSON 다운로드">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 3h7l5 5v13H7z" />
+              <path d="M14 3v5h5M12 11v7M9 15l3 3 3-3" />
+            </svg>
+          </button>
+          <button id="importSettings" class="button button-secondary icon-button" type="button" title="설정 JSON 업로드"
+            aria-label="설정 JSON 업로드">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 3h7l5 5v13H7z" />
+              <path d="M14 3v5h5M12 18v-7M9 14l3-3 3 3" />
             </svg>
           </button>
           <button id="newProject" class="button button-secondary" type="button">새로 만들기</button>
@@ -532,8 +626,34 @@
             <span>시간표시</span>
             <button id="includeTime" class="format-toggle" type="button" aria-pressed="false"><i>T</i></button>
           </label>
-
         </div>
+
+        <div class="field">
+          <label>테마</label>
+          <select id="theme">
+            <option value="classic">Classic Ring</option>
+            <option value="double">Double Ring</option>
+            <option value="minimal">Minimal</option>
+            <option value="dot">Dot Marker</option>
+          </select>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label>배경 투명도</label>
+            <input id="outsideOpacity" type="range" min="0" max="1" step="0.01" value="0.30" />
+          </div>
+
+          <div class="field">
+            <label>배경색</label>
+            <input id="outsideColor" type="color" value="#000000" />
+          </div>
+        </div>
+
+      </details>
+
+      <details class="section section-text" open>
+        <summary>텍스트</summary>
 
         <div class="field">
           <label>텍스트</label>
@@ -600,40 +720,18 @@
 
         <div class="compact-group">
           <div class="field">
-            <label>레이블 간격</label>
+            <label>텍스트 높이</label>
             <div class="range-row">
               <input id="labelGap" type="range" min="-3" max="3" step="0.5" value="0" />
               <output id="labelGapValue" class="range-value">0</output>
             </div>
           </div>
           <div class="field">
-            <label>레이블 좌우</label>
+            <label>텍스트 좌우</label>
             <div class="range-row">
               <input id="labelOffset" type="range" min="-15" max="15" step="1" value="0" />
               <output id="labelOffsetValue" class="range-value">0</output>
             </div>
-          </div>
-        </div>
-
-        <div class="field">
-          <label>테마</label>
-          <select id="theme">
-            <option value="classic">Classic Ring</option>
-            <option value="double">Double Ring</option>
-            <option value="minimal">Minimal</option>
-            <option value="dot">Dot Marker</option>
-          </select>
-        </div>
-
-        <div class="field-row">
-          <div class="field">
-            <label>배경 투명도</label>
-            <input id="outsideOpacity" type="range" min="0" max="1" step="0.01" value="0.30" />
-          </div>
-
-          <div class="field">
-            <label>배경색</label>
-            <input id="outsideColor" type="color" value="#000000" />
           </div>
         </div>
 
@@ -644,7 +742,7 @@
     <main class="preview">
       <div id="canvas" class="canvas">
         <div id="bg" class="bg">
-          <img id="bgImg" class="bg-img" alt="">
+          <img id="bgImg" class="bg-img" alt="" draggable="false">
         </div>
         <div id="outsideMask" class="outside-mask"></div>
         <div id="clock" class="clock"></div>
@@ -762,6 +860,10 @@
       exportSettings: $("exportSettings"),
       importSettings: $("importSettings"),
       importSettingsFile: $("importSettingsFile"),
+      slotSelect: $("slotSelect"),
+      saveSlot: $("saveSlot"),
+      loadSlot: $("loadSlot"),
+      clearSlot: $("clearSlot"),
       newProject: $("newProject"),
 
       canvas: $("canvas"),
@@ -846,6 +948,110 @@
         db.close();
       } catch (error) {
         console.warn("설정 캐시를 지우지 못했습니다.", error);
+      }
+    }
+
+    function getSelectedSlotKey() {
+      return `slot-${els.slotSelect.value}`;
+    }
+
+    async function readSettingsKey(key) {
+      const db = await openSettingsDb();
+      const value = await new Promise((resolve, reject) => {
+        const request = db.transaction(DB_STORE).objectStore(DB_STORE).get(key);
+        request.addEventListener("success", () => resolve(request.result));
+        request.addEventListener("error", () => reject(request.error));
+      });
+      db.close();
+      return value;
+    }
+
+    async function writeSettingsKey(key, value) {
+      const db = await openSettingsDb();
+      await new Promise((resolve, reject) => {
+        const request = db
+          .transaction(DB_STORE, "readwrite")
+          .objectStore(DB_STORE)
+          .put(value, key);
+
+        request.addEventListener("success", () => resolve());
+        request.addEventListener("error", () => reject(request.error));
+      });
+      db.close();
+    }
+
+    async function deleteSettingsKey(key) {
+      const db = await openSettingsDb();
+      await new Promise((resolve, reject) => {
+        const request = db
+          .transaction(DB_STORE, "readwrite")
+          .objectStore(DB_STORE)
+          .delete(key);
+
+        request.addEventListener("success", () => resolve());
+        request.addEventListener("error", () => reject(request.error));
+      });
+      db.close();
+    }
+
+    async function saveSelectedSlot() {
+      const slotLabel = els.slotSelect.options[els.slotSelect.selectedIndex].textContent;
+      const shouldSave = window.confirm(`${slotLabel}에 현재 작업을 저장할까요? 기존 슬롯 내용은 덮어씁니다.`);
+      if (!shouldSave) return;
+
+      try {
+        await writeSettingsKey(getSelectedSlotKey(), {
+          ...state,
+          savedAt: new Date().toISOString()
+        });
+        window.alert(`${slotLabel}에 저장했습니다.`);
+      } catch (error) {
+        console.warn("슬롯 저장에 실패했습니다.", error);
+        window.alert("슬롯에 저장하지 못했습니다.");
+      }
+    }
+
+    async function loadSelectedSlot() {
+      const slotLabel = els.slotSelect.options[els.slotSelect.selectedIndex].textContent;
+
+      try {
+        const cached = await readSettingsKey(getSelectedSlotKey());
+        if (!cached) {
+          window.alert(`${slotLabel}에 저장된 작업이 없습니다.`);
+          return;
+        }
+
+        Object.assign(state, createDefaultState(), cached);
+        state.labelGap = clamp(state.labelGap, -3, 3);
+        syncControlsFromState();
+        populateTimePicker();
+        updateImageControlRange();
+        render();
+        await saveSettings();
+      } catch (error) {
+        console.warn("슬롯 불러오기에 실패했습니다.", error);
+        window.alert("슬롯을 불러오지 못했습니다.");
+      }
+    }
+
+    async function clearSelectedSlot() {
+      const slotLabel = els.slotSelect.options[els.slotSelect.selectedIndex].textContent;
+
+      try {
+        const cached = await readSettingsKey(getSelectedSlotKey());
+        if (!cached) {
+          window.alert(`${slotLabel}은 이미 비어 있습니다.`);
+          return;
+        }
+
+        const shouldClear = window.confirm(`${slotLabel}에 저장된 작업을 삭제할까요?`);
+        if (!shouldClear) return;
+
+        await deleteSettingsKey(getSelectedSlotKey());
+        window.alert(`${slotLabel}을 비웠습니다.`);
+      } catch (error) {
+        console.warn("슬롯 초기화에 실패했습니다.", error);
+        window.alert("슬롯을 초기화하지 못했습니다.");
       }
     }
 
@@ -1036,6 +1242,69 @@
 
       els.imageX.value = state.imageX;
       els.imageY.value = state.imageY;
+    }
+
+    function syncImagePositionControls() {
+      els.imageX.value = state.imageX;
+      els.imageY.value = state.imageY;
+      updateRangeValues();
+    }
+
+    function clampImagePosition() {
+      state.imageX = clamp(state.imageX, Number(els.imageX.min), Number(els.imageX.max));
+      state.imageY = clamp(state.imageY, Number(els.imageY.min), Number(els.imageY.max));
+    }
+
+    function bindImageDrag() {
+      let drag = null;
+
+      els.canvas.addEventListener("pointerdown", event => {
+        if (!state.imageUrl) return;
+
+        drag = {
+          startX: event.clientX,
+          startY: event.clientY,
+          imageX: state.imageX,
+          imageY: state.imageY
+        };
+
+        els.canvas.classList.add("is-dragging");
+        els.canvas.setPointerCapture(event.pointerId);
+      });
+
+      els.canvas.addEventListener("dragstart", event => {
+        event.preventDefault();
+      });
+
+      els.canvas.addEventListener("pointermove", event => {
+        if (!drag) return;
+
+        state.imageX = Math.round(drag.imageX + event.clientX - drag.startX);
+        state.imageY = Math.round(drag.imageY + event.clientY - drag.startY);
+        clampImagePosition();
+        syncImagePositionControls();
+        render();
+      });
+
+      function endDrag(event) {
+        if (!drag) return;
+
+        drag = null;
+        els.canvas.classList.remove("is-dragging");
+        if (els.canvas.hasPointerCapture(event.pointerId)) {
+          els.canvas.releasePointerCapture(event.pointerId);
+        }
+        saveSettings();
+      }
+
+      els.canvas.addEventListener("pointerup", endDrag);
+      els.canvas.addEventListener("pointercancel", endDrag);
+      els.canvas.addEventListener("lostpointercapture", () => {
+        if (!drag) return;
+        drag = null;
+        els.canvas.classList.remove("is-dragging");
+        saveSettings();
+      });
     }
 
     function updateOutsideMask(clockSize, ringSize) {
@@ -1272,7 +1541,11 @@
         const file = event.target.files[0];
         if (file) importSettingsJson(file);
       });
+      els.saveSlot.addEventListener("click", saveSelectedSlot);
+      els.loadSlot.addEventListener("click", loadSelectedSlot);
+      els.clearSlot.addEventListener("click", clearSelectedSlot);
       els.newProject.addEventListener("click", createNewProject);
+      bindImageDrag();
     }
 
     async function downloadPng() {
