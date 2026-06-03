@@ -22,6 +22,16 @@
       font-family: Pretendard, "Noto Sans KR", system-ui, sans-serif;
     }
 
+    body.drawer-open {
+      overflow: hidden;
+    }
+
+    body.drawer-open .menu-toggle {
+      left: auto;
+      right: calc(100vw - min(88vw, 360px) + 14px);
+      background: rgba(17, 17, 17, 0.94);
+    }
+
     .app {
       display: grid;
       grid-template-columns: 330px 1fr;
@@ -41,6 +51,34 @@
       order: 0;
       margin: 0 0 14px;
       font-size: 20px;
+    }
+
+    .menu-toggle {
+      display: none;
+      position: fixed;
+      left: 14px;
+      top: 14px;
+      z-index: 30;
+      height: 40px;
+      padding: 0 14px;
+      border: 1px solid rgba(241, 214, 168, 0.45);
+      border-radius: 999px;
+      background: rgba(35, 35, 35, 0.92);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      color: #f1d6a8;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .drawer-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 24;
+      border: 0;
+      background: rgba(0, 0, 0, 0.48);
+      cursor: pointer;
     }
 
     .sr-only {
@@ -455,13 +493,78 @@
 
     .preview {
       display: grid;
+      position: relative;
       place-items: center;
+      align-content: center;
+      gap: 12px;
       padding: 32px;
+      overflow: auto;
+    }
+
+    .preview-toolbar {
+      position: fixed;
+      right: 16px;
+      top: 50%;
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+
+      width: 38px;
+      height: 250px;
+      padding: 10px 7px;
+      border: 1px solid #3f3f3f;
+      border-radius: 6px;
+      background: rgba(35, 35, 35, 0.92);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+      transform: translateY(-50%);
+    }
+
+    .preview-toolbar .zoom-fit {
+      width: 24px;
+      height: 22px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: #bdbdbd;
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
+    }
+
+    .preview-toolbar .zoom-fit.is-active {
+      color: #f1d6a8;
+    }
+
+    .preview-toolbar .zoom-slider {
+      flex: 1;
+      width: 170px;
+      height: 22px;
+      padding: 0;
+      writing-mode: vertical-lr;
+      direction: rtl;
+      accent-color: #ff8a65;
+    }
+
+    @media (max-width: 760px) {
+      .preview-toolbar {
+        position: fixed;
+        top: 50%;
+        right: 8px;
+        width: 34px;
+        height: 220px;
+        padding: 9px 6px;
+      }
+
+      .preview-toolbar .zoom-slider {
+        width: 145px;
+      }
     }
 
     .canvas {
       position: relative;
-      width: min(80vw, 900px);
+      width: var(--preview-size, min(80vw, 900px));
       aspect-ratio: 1 / 1;
       overflow: hidden;
       background: #333;
@@ -563,13 +666,71 @@
       paint-order: stroke;
       stroke-linejoin: round;
     }
+
+    @media (max-width: 760px) {
+      .app {
+        display: block;
+        min-height: 100dvh;
+      }
+
+      .menu-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      body.drawer-open .menu-toggle {
+        z-index: 31;
+      }
+
+      .panel {
+        position: fixed;
+        inset: 0 auto 0 0;
+        z-index: 26;
+        width: min(88vw, 360px);
+        max-width: 360px;
+        border-right: 1px solid #555;
+        box-shadow: 18px 0 40px rgba(0, 0, 0, 0.45);
+        transform: translateX(-105%);
+        transition: transform 180ms ease;
+      }
+
+      .panel.is-open {
+        transform: translateX(0);
+      }
+
+      .drawer-overlay.is-visible {
+        display: block;
+      }
+
+      .preview {
+        min-height: 100dvh;
+        padding: 72px 14px 18px;
+      }
+
+      .canvas {
+        width: min(94vw, 94dvh);
+      }
+
+      .toast {
+        left: 14px;
+        right: 14px;
+        bottom: 14px;
+        max-width: none;
+        text-align: center;
+      }
+    }
   </style>
 </head>
 
 <body>
+  <button id="menuToggle" class="menu-toggle" type="button" aria-controls="settingsPanel"
+    aria-expanded="false">설정</button>
+  <button id="drawerOverlay" class="drawer-overlay" type="button" aria-label="설정 닫기"></button>
+
   <div class="app">
 
-    <aside class="panel">
+    <aside id="settingsPanel" class="panel">
       <h1>시계 설정</h1>
       <p class="hint">배경 그림을 넣고 시계 모양과 시간을 조절한 뒤 PNG로 저장하세요.</p>
 
@@ -817,6 +978,19 @@
     </aside>
 
     <main class="preview">
+      <div class="preview-toolbar" aria-label="프리뷰 확대">
+        <button id="previewFit" class="zoom-fit" type="button" title="맞춤">▰</button>
+        <input id="previewZoom" class="zoom-slider" type="range" min="25" max="200" step="5" value="100" />
+        <output id="previewZoomValue" class="sr-only">맞춤</output>
+      </div>
+      <!-- <div class="preview-toolbar" aria-label="프리뷰 확대">
+        <button id="previewFit" type="button">맞춤</button>
+        <label>
+          <span>확대</span>
+          <input id="previewZoom" type="range" min="25" max="200" step="5" value="100" />
+          <output id="previewZoomValue">맞춤</output>
+        </label>
+      </div> -->
       <div id="canvas" class="canvas">
         <div id="bg" class="bg">
           <img id="bgImg" class="bg-img" alt="" draggable="false">
@@ -883,6 +1057,7 @@
 
         outsideColor: "#000000",
         outsideOpacity: 0.30,
+        previewZoom: "fit",
         clockSectionOpen: true,
         textSectionOpen: true
       };
@@ -997,6 +1172,9 @@
       clockColor: $("clockColor"),
       outsideColor: $("outsideColor"),
       outsideOpacity: $("outsideOpacity"),
+      previewFit: $("previewFit"),
+      previewZoom: $("previewZoom"),
+      previewZoomValue: $("previewZoomValue"),
       exportSize: $("exportSize"),
       download: $("download"),
       undo: $("undo"),
@@ -1012,6 +1190,9 @@
       imageSection: $("imageSection"),
       clockSection: $("clockSection"),
       textSection: $("textSection"),
+      menuToggle: $("menuToggle"),
+      drawerOverlay: $("drawerOverlay"),
+      settingsPanel: $("settingsPanel"),
 
       canvas: $("canvas"),
       bg: $("bg"),
@@ -1555,6 +1736,7 @@
       updateFormatToggle(els.labelFillNone, state.labelFillNone);
       updateFormatToggle(els.labelStrokeNone, state.labelStrokeNone);
       updateCustomFontVisibility();
+      updatePreviewZoom();
       syncSectionOpenStates();
     }
 
@@ -1562,6 +1744,38 @@
       els.imageSection.open = Boolean(state.imageSectionOpen);
       els.clockSection.open = Boolean(state.clockSectionOpen);
       els.textSection.open = Boolean(state.textSectionOpen);
+    }
+
+    function updatePreviewZoom() {
+      const isFit = state.previewZoom === "fit";
+      const fitSize = getPreviewFitSize();
+
+      els.previewFit.classList.toggle("is-active", isFit);
+      els.previewFit.setAttribute("aria-pressed", String(isFit));
+
+      if (isFit) {
+        els.canvas.style.setProperty("--preview-size", `${fitSize}px`);
+        els.previewZoomValue.textContent = "맞춤";
+        return;
+      }
+
+      const zoom = clamp(state.previewZoom, Number(els.previewZoom.min), Number(els.previewZoom.max));
+      const previewSize = Math.round(fitSize * (zoom / 100));
+
+      state.previewZoom = zoom;
+      els.previewZoom.value = zoom;
+      els.previewZoomValue.textContent = `${zoom}%`;
+      els.canvas.style.setProperty("--preview-size", `${previewSize}px`);
+    }
+
+    function getPreviewFitSize() {
+      const rect = document.querySelector(".preview").getBoundingClientRect();
+      const isMobile = window.matchMedia("(max-width: 760px)").matches;
+      const widthPadding = isMobile ? 28 : 64;
+      const heightPadding = isMobile ? 90 : 64;
+      const availableWidth = Math.max(240, rect.width - widthPadding);
+      const availableHeight = Math.max(240, rect.height - heightPadding);
+      return Math.round(Math.min(availableWidth, availableHeight, 900));
     }
 
     function bindSectionOpenState(section, key) {
@@ -1624,6 +1838,23 @@
       button.setAttribute("aria-pressed", String(isActive));
     }
 
+    function setSettingsDrawerOpen(isOpen) {
+      els.settingsPanel.classList.toggle("is-open", isOpen);
+      els.drawerOverlay.classList.toggle("is-visible", isOpen);
+      els.menuToggle.setAttribute("aria-expanded", String(isOpen));
+      els.menuToggle.textContent = isOpen ? "닫기" : "설정";
+      els.menuToggle.setAttribute("aria-label", isOpen ? "설정 닫기" : "설정 열기");
+      document.body.classList.toggle("drawer-open", isOpen);
+    }
+
+    function toggleSettingsDrawer() {
+      setSettingsDrawerOpen(!els.settingsPanel.classList.contains("is-open"));
+    }
+
+    function closeSettingsDrawer() {
+      setSettingsDrawerOpen(false);
+    }
+
     function getClockColor() {
       return state.clockColor || themes[state.theme].color;
     }
@@ -1656,6 +1887,7 @@
       const ringSize = RING_SIZE;
       els.clock.innerHTML = "";
       updateRangeValues();
+      updatePreviewZoom();
 
       els.clock.style.setProperty("--clock-size", `${DEFAULT_CLOCK_SIZE}%`);
       els.clock.style.setProperty("--ring-size", `${ringSize}%`);
@@ -2028,20 +2260,50 @@
         const file = event.target.files[0];
         if (file) importSettingsJson(file);
       });
+      els.previewFit.addEventListener("click", () => {
+        state.previewZoom = "fit";
+        updatePreviewZoom();
+        updateImageControlRange();
+        render();
+        saveSettings();
+      });
+      els.previewZoom.addEventListener("input", event => {
+        state.previewZoom = Number(event.target.value);
+        updatePreviewZoom();
+        updateImageControlRange();
+        render();
+      });
+      els.previewZoom.addEventListener("change", () => {
+        saveSettings({ notify: true });
+      });
       els.saveSlot.addEventListener("click", saveSelectedSlot);
       els.clearSlot.addEventListener("click", clearSelectedSlot);
       els.slotSelect.addEventListener("change", event => {
         changeSelectedSlot(event.target.value);
       });
       els.newProject.addEventListener("click", createNewProject);
+      els.menuToggle.addEventListener("click", toggleSettingsDrawer);
+      els.drawerOverlay.addEventListener("click", closeSettingsDrawer);
       bindSectionOpenState(els.imageSection, "imageSectionOpen");
       bindSectionOpenState(els.clockSection, "clockSectionOpen");
       bindSectionOpenState(els.textSection, "textSectionOpen");
       window.addEventListener("keydown", handleKeyboardShortcuts);
+      window.addEventListener("resize", () => {
+        if (window.matchMedia("(min-width: 761px)").matches) {
+          closeSettingsDrawer();
+        }
+        updateImageControlRange();
+        render();
+      });
       bindImageDrag();
     }
 
     function handleKeyboardShortcuts(event) {
+      if (event.key === "Escape") {
+        closeSettingsDrawer();
+        return;
+      }
+
       if (!event.ctrlKey || event.altKey || event.metaKey) return;
 
       const key = event.key.toLowerCase();
