@@ -409,7 +409,7 @@
     }
 
     .slot-tools {
-      grid-template-columns: minmax(0, 1fr) 32px 32px 32px;
+      grid-template-columns: minmax(0, 1fr) 32px 32px;
       align-items: center;
     }
 
@@ -421,6 +421,36 @@
       border-radius: 6px;
       background: #111;
       color: #fff;
+    }
+
+    .toast {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      z-index: 20;
+      max-width: min(320px, calc(100vw - 40px));
+      padding: 10px 14px;
+      border: 1px solid rgba(241, 214, 168, 0.4);
+      border-radius: 999px;
+      background: rgba(22, 22, 22, 0.92);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+      color: #f1d6a8;
+      font-size: 13px;
+      line-height: 1.35;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(8px);
+      transition: opacity 160ms ease, transform 160ms ease;
+    }
+
+    .toast.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .toast.is-error {
+      border-color: rgba(255, 154, 154, 0.45);
+      color: #ff9a9a;
     }
 
     .preview {
@@ -565,19 +595,13 @@
             <option value="3">슬롯 3</option>
             <option value="4">슬롯 4</option>
             <option value="5">슬롯 5</option>
+            <option value="6">슬롯 6</option>
           </select>
           <button id="saveSlot" class="button button-secondary icon-button" type="button" title="선택 슬롯에 저장"
             aria-label="선택 슬롯에 저장">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M5 4h12l2 2v14H5z" />
               <path d="M8 4v6h8V4M8 20v-6h8v6" />
-            </svg>
-          </button>
-          <button id="loadSlot" class="button button-secondary icon-button" type="button" title="선택 슬롯 불러오기"
-            aria-label="선택 슬롯 불러오기">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M3 19V6h7l2 3h9v10z" />
-              <path d="m9 14 3-3 3 3M12 11v6" />
             </svg>
           </button>
           <button id="clearSlot" class="button button-secondary icon-button" type="button" title="선택 슬롯 초기화"
@@ -621,7 +645,7 @@
         <input id="importSettingsFile" type="file" accept="application/json,.json" hidden />
       </section>
 
-      <details class="section section-image" open>
+      <details id="imageSection" class="section section-image" open>
         <summary>이미지</summary>
 
         <div class="field">
@@ -656,7 +680,7 @@
         </div>
       </details>
 
-      <details class="section section-clock" open>
+      <details id="clockSection" class="section section-clock" open>
         <summary>시계</summary>
 
         <div class="time-picker label-toolbar">
@@ -705,7 +729,7 @@
 
       </details>
 
-      <details class="section section-text" open>
+      <details id="textSection" class="section section-text" open>
         <summary>텍스트</summary>
 
         <div class="field">
@@ -804,10 +828,25 @@
 
   </div>
 
+  <div id="statusMessage" class="toast" role="status" aria-live="polite"></div>
+
   <script>
     const RING_SIZE = 88;
     const DEFAULT_CLOCK_SIZE = 96;
     const CLOCK_CENTER_Y = 54;
+    const TICK_RADIUS_PERCENT = 43;
+    const BAR_TICK_WIDTH_PERCENT = 1.5;
+    const BAR_TICK_HEIGHT_PERCENT = 7;
+    const DOT_TICK_SIZE_PERCENT = 2.8;
+    const HOUR_HAND_LENGTH_PERCENT = 27;
+    const MINUTE_HAND_LENGTH_PERCENT = 36;
+    const CENTER_DOT_SIZE_PERCENT = 3.5;
+    const LABEL_FONT_SIZE_PERCENT = 6.2;
+    const LABEL_RADIUS_BASE_PERCENT = 45;
+    const LABEL_START_OFFSET_BASE_PERCENT = 50;
+    const LABEL_OFFSET_TO_ANGLE_RATIO = Math.PI / 100;
+    const LABEL_STROKE_WITH_FILL_PERCENT = 1.25;
+    const LABEL_STROKE_ONLY_PERCENT = 0.62;
     const HISTORY_LIMIT = 30;
     const DB_NAME = "clock-image-maker";
     const DB_STORE = "settings";
@@ -820,6 +859,7 @@
         imageX: 0,
         imageY: 0,
         imageScale: 100,
+        imageSectionOpen: true,
 
         labelText: "",
         labelFont: "Pretendard, 'Noto Sans KR', sans-serif",
@@ -842,7 +882,9 @@
         clockColor: "#fff8ec",
 
         outsideColor: "#000000",
-        outsideOpacity: 0.30
+        outsideOpacity: 0.30,
+        clockSectionOpen: true,
+        textSectionOpen: true
       };
     }
 
@@ -851,34 +893,74 @@
     const redoStack = [];
     let pendingHistorySnapshot = null;
     let pendingHistoryCommitted = false;
+    const historyImages = new Map();
+    let historyImageId = 0;
+    let statusTimer = null;
+    let cacheStatusTimer = null;
+    let settingsSaveVersion = 0;
+    let activeSlotBaselineSnapshot = null;
 
     const themes = {
       classic: {
         color: "#fff8ec",
-        ringBorder: "10px solid #fff8ec",
-        tickType: "bar",
-        handType: "round",
+        ring: {
+          widthPx: 10,
+          widthPercent: 0.009,
+          style: "solid"
+        },
+        ticks: {
+          type: "bar"
+        },
+        hands: {
+          type: "round"
+        },
         centerDot: false
       },
       double: {
         color: "#fff8ec",
-        ringBorder: "8px double #fff8ec",
-        tickType: "bar",
-        handType: "diamond",
+        ring: {
+          widthPx: 8,
+          widthPercent: 0.009,
+          style: "double",
+          innerWidthPercent: 0.003,
+          innerInsetPercent: 0.009
+        },
+        ticks: {
+          type: "bar"
+        },
+        hands: {
+          type: "diamond"
+        },
         centerDot: false
       },
       minimal: {
         color: "#ffffff",
-        ringBorder: "4px solid #ffffff",
-        tickType: "none",
-        handType: "thin",
+        ring: {
+          widthPx: 4,
+          widthPercent: 0.004,
+          style: "solid"
+        },
+        ticks: {
+          type: "none"
+        },
+        hands: {
+          type: "thin"
+        },
         centerDot: false
       },
       dot: {
         color: "#ffffff",
-        ringBorder: "8px solid #ffffff",
-        tickType: "dot",
-        handType: "taper",
+        ring: {
+          widthPx: 8,
+          widthPercent: 0.009,
+          style: "solid"
+        },
+        ticks: {
+          type: "dot"
+        },
+        hands: {
+          type: "taper"
+        },
         centerDot: true
       }
     };
@@ -919,14 +1001,17 @@
       download: $("download"),
       undo: $("undo"),
       redo: $("redo"),
+      statusMessage: $("statusMessage"),
       exportSettings: $("exportSettings"),
       importSettings: $("importSettings"),
       importSettingsFile: $("importSettingsFile"),
       slotSelect: $("slotSelect"),
       saveSlot: $("saveSlot"),
-      loadSlot: $("loadSlot"),
       clearSlot: $("clearSlot"),
       newProject: $("newProject"),
+      imageSection: $("imageSection"),
+      clockSection: $("clockSection"),
+      textSection: $("textSection"),
 
       canvas: $("canvas"),
       bg: $("bg"),
@@ -979,7 +1064,10 @@
       }
     }
 
-    async function saveSettings() {
+    async function saveSettings(options = {}) {
+      const { notify = false } = options;
+      const saveVersion = ++settingsSaveVersion;
+
       try {
         const db = await openSettingsDb();
         await new Promise((resolve, reject) => {
@@ -992,22 +1080,111 @@
           request.addEventListener("error", () => reject(request.error));
         });
         db.close();
+        if (notify && saveVersion === settingsSaveVersion) {
+          queueCacheSavedStatus();
+        }
       } catch (error) {
         console.warn("설정 캐시를 저장하지 못했습니다.", error);
+        if (saveVersion === settingsSaveVersion) {
+          showStatus("캐시 저장 실패", "error", 3500);
+        }
       }
     }
 
+    function getHistoryImageRef(imageUrl) {
+      if (!imageUrl) return "";
+
+      for (const [ref, cachedImageUrl] of historyImages.entries()) {
+        if (cachedImageUrl === imageUrl) return ref;
+      }
+
+      const ref = `image-${++historyImageId}`;
+      historyImages.set(ref, imageUrl);
+      return ref;
+    }
+
     function cloneSettingsSnapshot() {
-      return JSON.parse(JSON.stringify(state));
+      const snapshot = JSON.parse(JSON.stringify(state));
+      snapshot.imageRef = getHistoryImageRef(snapshot.imageUrl);
+      delete snapshot.imageUrl;
+      return snapshot;
+    }
+
+    function expandSettingsSnapshot(snapshot) {
+      if (!snapshot || Object.prototype.hasOwnProperty.call(snapshot, "imageUrl")) {
+        return JSON.parse(JSON.stringify(snapshot || {}));
+      }
+
+      const expanded = JSON.parse(JSON.stringify(snapshot));
+      expanded.imageUrl = expanded.imageRef
+        ? historyImages.get(expanded.imageRef) || ""
+        : "";
+      delete expanded.imageRef;
+      return expanded;
     }
 
     function snapshotsEqual(a, b) {
-      return JSON.stringify(a) === JSON.stringify(b);
+      const snapshotA = Object.prototype.hasOwnProperty.call(a || {}, "imageUrl")
+        ? cloneComparableSnapshot(a)
+        : a;
+      const snapshotB = Object.prototype.hasOwnProperty.call(b || {}, "imageUrl")
+        ? cloneComparableSnapshot(b)
+        : b;
+      return JSON.stringify(snapshotA) === JSON.stringify(snapshotB);
+    }
+
+    function cloneComparableSnapshot(value) {
+      const snapshot = JSON.parse(JSON.stringify(value || {}));
+      snapshot.imageRef = getHistoryImageRef(snapshot.imageUrl);
+      delete snapshot.imageUrl;
+      return snapshot;
     }
 
     function updateHistoryButtons() {
       els.undo.disabled = undoStack.length === 0;
       els.redo.disabled = redoStack.length === 0;
+    }
+
+    function showStatus(message, type = "info", duration = 2000) {
+      window.clearTimeout(statusTimer);
+      window.clearTimeout(cacheStatusTimer);
+      els.statusMessage.textContent = message;
+      els.statusMessage.classList.toggle("is-error", type === "error");
+      els.statusMessage.classList.add("is-visible");
+
+      statusTimer = window.setTimeout(() => {
+        els.statusMessage.classList.remove("is-visible", "is-error");
+      }, duration);
+    }
+
+    function queueCacheSavedStatus() {
+      window.clearTimeout(cacheStatusTimer);
+      cacheStatusTimer = window.setTimeout(() => {
+        showStatus("캐시에 저장됨", "info", 1400);
+      }, 450);
+    }
+
+    function cleanupHistoryImages() {
+      const usedRefs = new Set();
+
+      [...undoStack, ...redoStack, pendingHistorySnapshot]
+        .filter(Boolean)
+        .forEach(snapshot => {
+          if (snapshot.imageRef) {
+            usedRefs.add(snapshot.imageRef);
+          }
+        });
+
+      const currentRef = getHistoryImageRef(state.imageUrl);
+      if (currentRef) {
+        usedRefs.add(currentRef);
+      }
+
+      Array.from(historyImages.keys()).forEach(ref => {
+        if (!usedRefs.has(ref)) {
+          historyImages.delete(ref);
+        }
+      });
     }
 
     function pushUndoSnapshot(snapshot = cloneSettingsSnapshot()) {
@@ -1021,6 +1198,7 @@
       }
 
       redoStack.length = 0;
+      cleanupHistoryImages();
       updateHistoryButtons();
     }
 
@@ -1054,7 +1232,7 @@
     }
 
     async function applySettingsSnapshot(snapshot) {
-      Object.assign(state, createDefaultState(), snapshot);
+      Object.assign(state, createDefaultState(), expandSettingsSnapshot(snapshot));
       state.labelGap = clamp(state.labelGap, -3, 3);
       els.file.value = "";
       syncControlsFromState();
@@ -1072,6 +1250,7 @@
       redoStack.push(cloneSettingsSnapshot());
       const previous = undoStack.pop();
       await applySettingsSnapshot(previous);
+      cleanupHistoryImages();
     }
 
     async function redoSettings() {
@@ -1081,6 +1260,7 @@
       undoStack.push(cloneSettingsSnapshot());
       const next = redoStack.pop();
       await applySettingsSnapshot(next);
+      cleanupHistoryImages();
     }
 
     async function clearSettings() {
@@ -1154,11 +1334,23 @@
       return normalized;
     }
 
+    function getCurrentSlotSnapshot() {
+      return normalizeSlotSnapshot(state);
+    }
+
+    function setActiveSlotBaseline(snapshot = state) {
+      activeSlotBaselineSnapshot = normalizeSlotSnapshot(snapshot);
+    }
+
     async function hasUnsavedChangesForSlot(slotValue) {
+      if (String(slotValue) === String(activeSlotValue) && activeSlotBaselineSnapshot) {
+        return !snapshotsEqual(activeSlotBaselineSnapshot, getCurrentSlotSnapshot());
+      }
+
       const cached = await readSettingsKey(`slot-${slotValue}`);
       return !snapshotsEqual(
         normalizeSlotSnapshot(cached),
-        normalizeSlotSnapshot(state)
+        getCurrentSlotSnapshot()
       );
     }
 
@@ -1189,17 +1381,23 @@
         activeSlotValue = String(nextValue);
         const nextSlot = await readSettingsKey(`slot-${nextValue}`);
         if (!nextSlot) {
-          window.alert(`${getSlotLabel(nextValue)}에 저장된 작업이 없습니다.`);
+          applySlotSnapshot(createDefaultState());
+          els.file.value = "";
+          setActiveSlotBaseline();
+          await saveSettings();
+          showStatus(`${els.slotSelect.options[els.slotSelect.selectedIndex].textContent}은 비어 있어 새 작업을 시작했습니다.`);
           return;
         }
 
         applySlotSnapshot(nextSlot);
+        setActiveSlotBaseline(nextSlot);
         await saveSettings();
+        showStatus(`${els.slotSelect.options[els.slotSelect.selectedIndex].textContent}을 불러왔습니다.`);
       } catch (error) {
         console.warn("슬롯 변경 확인에 실패했습니다.", error);
         els.slotSelect.value = previousValue;
         activeSlotValue = previousValue;
-        window.alert("슬롯 상태를 확인하지 못했습니다.");
+        showStatus("슬롯 상태를 확인하지 못했습니다.", "error");
       }
     }
 
@@ -1223,28 +1421,11 @@
           ...state,
           savedAt: new Date().toISOString()
         });
-        window.alert(`${slotLabel}에 저장했습니다.`);
+        setActiveSlotBaseline();
+        showStatus(`${slotLabel}에 저장했습니다.`);
       } catch (error) {
         console.warn("슬롯 저장에 실패했습니다.", error);
-        window.alert("슬롯에 저장하지 못했습니다.");
-      }
-    }
-
-    async function loadSelectedSlot() {
-      const slotLabel = els.slotSelect.options[els.slotSelect.selectedIndex].textContent;
-
-      try {
-        const cached = await readSettingsKey(getSelectedSlotKey());
-        if (!cached) {
-          window.alert(`${slotLabel}에 저장된 작업이 없습니다.`);
-          return;
-        }
-
-        applySlotSnapshot(cached);
-        await saveSettings();
-      } catch (error) {
-        console.warn("슬롯 불러오기에 실패했습니다.", error);
-        window.alert("슬롯을 불러오지 못했습니다.");
+        showStatus("슬롯에 저장하지 못했습니다.", "error");
       }
     }
 
@@ -1254,7 +1435,7 @@
       try {
         const cached = await readSettingsKey(getSelectedSlotKey());
         if (!cached) {
-          window.alert(`${slotLabel}은 이미 비어 있습니다.`);
+          showStatus(`${slotLabel}은 이미 비어 있습니다.`);
           return;
         }
 
@@ -1262,10 +1443,10 @@
         if (!shouldClear) return;
 
         await deleteSettingsKey(getSelectedSlotKey());
-        window.alert(`${slotLabel}을 비웠습니다.`);
+        showStatus(`${slotLabel}을 비웠습니다.`);
       } catch (error) {
         console.warn("슬롯 초기화에 실패했습니다.", error);
-        window.alert("슬롯을 초기화하지 못했습니다.");
+        showStatus("슬롯을 초기화하지 못했습니다.", "error");
       }
     }
 
@@ -1283,6 +1464,9 @@
       populateTimePicker();
       updateImageControlRange();
       render();
+      setActiveSlotBaseline();
+      await saveSettings();
+      showStatus("새 작업을 시작했습니다.");
     }
 
     function exportSettingsJson() {
@@ -1301,6 +1485,7 @@
       link.href = url;
       link.click();
       URL.revokeObjectURL(url);
+      showStatus("설정 JSON을 다운로드했습니다.");
     }
 
     function importSettingsJson(file) {
@@ -1325,16 +1510,18 @@
           populateTimePicker();
           updateImageControlRange();
           render();
+          setActiveSlotBaseline();
           await saveSettings();
+          showStatus("설정 JSON을 불러왔습니다.");
         } catch (error) {
-          window.alert(error.message || "설정 JSON을 불러오지 못했습니다.");
+          showStatus(error.message || "설정 JSON을 불러오지 못했습니다.", "error");
         } finally {
           els.importSettingsFile.value = "";
         }
       });
 
       reader.addEventListener("error", () => {
-        window.alert("설정 JSON 파일을 읽지 못했습니다.");
+        showStatus("설정 JSON 파일을 읽지 못했습니다.", "error");
         els.importSettingsFile.value = "";
       });
 
@@ -1368,6 +1555,20 @@
       updateFormatToggle(els.labelFillNone, state.labelFillNone);
       updateFormatToggle(els.labelStrokeNone, state.labelStrokeNone);
       updateCustomFontVisibility();
+      syncSectionOpenStates();
+    }
+
+    function syncSectionOpenStates() {
+      els.imageSection.open = Boolean(state.imageSectionOpen);
+      els.clockSection.open = Boolean(state.clockSectionOpen);
+      els.textSection.open = Boolean(state.textSectionOpen);
+    }
+
+    function bindSectionOpenState(section, key) {
+      section.addEventListener("toggle", () => {
+        state[key] = section.open;
+        saveSettings();
+      });
     }
 
     function getLabelFontFamily() {
@@ -1391,6 +1592,29 @@
       return state.labelBold ? 900 : 400;
     }
 
+    function getLabelGeometry(clockDiameter = 100) {
+      const radiusPercent = LABEL_RADIUS_BASE_PERCENT + Number(state.labelGap);
+      const fontSizePercent = LABEL_FONT_SIZE_PERCENT * (state.labelFontSize / 100);
+      const strokeWidthPercent = state.labelFillNone
+        ? LABEL_STROKE_ONLY_PERCENT
+        : LABEL_STROKE_WITH_FILL_PERCENT;
+
+      return {
+        radiusPercent,
+        radius: clockDiameter * (radiusPercent / 100),
+        startOffsetPercent: LABEL_START_OFFSET_BASE_PERCENT + Number(state.labelOffset),
+        centerAngle: -Math.PI / 2 + (Number(state.labelOffset) * LABEL_OFFSET_TO_ANGLE_RATIO),
+        fontSizePercent,
+        fontSize: clockDiameter * (fontSizePercent / 100),
+        strokeWidthPercent,
+        strokeWidth: clockDiameter * (strokeWidthPercent / 100)
+      };
+    }
+
+    function getLabelFontCss(fontSize) {
+      return `${state.labelItalic ? "italic " : ""}${getLabelFontWeight()} ${fontSize}px ${getLabelFontFamily()}`;
+    }
+
     function updateCustomFontVisibility() {
       els.customFontField.hidden = state.fontPreset !== "custom";
     }
@@ -1405,7 +1629,25 @@
     }
 
     function getRingBorder(theme) {
-      return theme.ringBorder.replace(/#[0-9a-fA-F]{6}/g, getClockColor());
+      return `${theme.ring.widthPx}px ${theme.ring.style} ${getClockColor()}`;
+    }
+
+    function getTickType(theme) {
+      return theme.ticks?.type || "bar";
+    }
+
+    function getHandType(theme) {
+      return theme.hands?.type || "round";
+    }
+
+    function getHandWidthPercent(theme, name) {
+      const handType = getHandType(theme);
+
+      if (handType === "round") return name === "hour" ? 2.5 : 1.5;
+      if (handType === "diamond") return name === "hour" ? 3.2 : 2.1;
+      if (handType === "thin") return name === "hour" ? 1.1 : 0.75;
+      if (handType === "taper") return name === "hour" ? 2.8 : 1.8;
+      return name === "hour" ? 2.5 : 1.5;
     }
 
     function render() {
@@ -1522,7 +1764,7 @@
           els.canvas.releasePointerCapture(event.pointerId);
         }
         commitHistoryChange();
-        saveSettings();
+        saveSettings({ notify: true });
       }
 
       els.canvas.addEventListener("pointerup", endDrag);
@@ -1532,7 +1774,7 @@
         drag = null;
         els.canvas.classList.remove("is-dragging");
         commitHistoryChange();
-        saveSettings();
+        saveSettings({ notify: true });
       });
     }
 
@@ -1558,28 +1800,27 @@
 
     function createCurvedLabel(parent) {
       const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      const labelRadius = 45 + Number(state.labelGap);
-      const labelStartOffset = 50 + Number(state.labelOffset);
+      const geometry = getLabelGeometry();
 
       svg.classList.add("label-svg");
       svg.setAttribute("viewBox", "0 0 100 100");
 
       svg.innerHTML = `
     <defs>
-      <path id="labelPath" d="M ${50 - labelRadius} 50 A ${labelRadius} ${labelRadius} 0 0 1 ${50 + labelRadius} 50" />
+      <path id="labelPath" d="M ${50 - geometry.radius} 50 A ${geometry.radius} ${geometry.radius} 0 0 1 ${50 + geometry.radius} 50" />
     </defs>
 
     <text
       font-family="${escapeAttr(getLabelFontFamily())}"
       font-weight="${getLabelFontWeight()}"
       font-style="${state.labelItalic ? "italic" : "normal"}"
-      font-size="${6.2 * (state.labelFontSize / 100)}"
+      font-size="${geometry.fontSize}"
       fill="${escapeAttr(state.labelFillNone ? "transparent" : state.labelFillColor)}"
       stroke="${escapeAttr(state.labelStrokeNone ? "transparent" : state.labelStrokeColor)}"
-      stroke-width="${state.labelFillNone ? "0.62" : "1.25"}">
+      stroke-width="${geometry.strokeWidth}">
       <textPath
         href="#labelPath"
-        startOffset="${labelStartOffset}%"
+        startOffset="${geometry.startOffsetPercent}%"
         text-anchor="middle">
         ${escapeHTML(getLabelText())}
       </textPath>
@@ -1590,9 +1831,10 @@
     }
 
     function createTicks(parent, theme) {
-      if (theme.tickType === "none") return;
+      const tickType = getTickType(theme);
+      if (tickType === "none") return;
 
-      const radius = 43;
+      const radius = TICK_RADIUS_PERCENT;
 
       for (let i = 0; i < 12; i++) {
         const angle = i * 30;
@@ -1605,16 +1847,16 @@
         tick.style.top = `${50 - Math.cos(rad) * radius}%`;
         tick.style.background = getClockColor();
 
-        if (theme.tickType === "bar") {
-          tick.style.width = "1.5%";
-          tick.style.height = "7%";
+        if (tickType === "bar") {
+          tick.style.width = `${BAR_TICK_WIDTH_PERCENT}%`;
+          tick.style.height = `${BAR_TICK_HEIGHT_PERCENT}%`;
           tick.style.borderRadius = "999px";
           tick.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
         }
 
-        if (theme.tickType === "dot") {
-          tick.style.width = "2.8%";
-          tick.style.height = "2.8%";
+        if (tickType === "dot") {
+          tick.style.width = `${DOT_TICK_SIZE_PERCENT}%`;
+          tick.style.height = `${DOT_TICK_SIZE_PERCENT}%`;
           tick.style.borderRadius = "50%";
           tick.style.transform = "translate(-50%, -50%)";
         }
@@ -1627,34 +1869,35 @@
       const hourAngle = ((state.hour % 12) * 30) + (state.minute * 0.5);
       const minuteAngle = state.minute * 6;
 
-      createHand(parent, "hour", hourAngle, 27, theme);
-      createHand(parent, "minute", minuteAngle, 36, theme);
+      createHand(parent, "hour", hourAngle, HOUR_HAND_LENGTH_PERCENT, theme);
+      createHand(parent, "minute", minuteAngle, MINUTE_HAND_LENGTH_PERCENT, theme);
     }
 
     function createHand(parent, name, angle, length, theme) {
+      const handType = getHandType(theme);
       const hand = document.createElement("div");
       hand.className = `hand ${name}`;
       hand.style.height = `${length}%`;
       hand.style.background = getClockColor();
       hand.style.transform = `translate(-50%, -100%) rotate(${angle}deg)`;
 
-      if (theme.handType === "round") {
-        hand.style.width = name === "hour" ? "2.5%" : "1.5%";
+      if (handType === "round") {
+        hand.style.width = `${getHandWidthPercent(theme, name)}%`;
         hand.style.borderRadius = "999px";
       }
 
-      if (theme.handType === "diamond") {
-        hand.style.width = name === "hour" ? "3.2%" : "2.1%";
+      if (handType === "diamond") {
+        hand.style.width = `${getHandWidthPercent(theme, name)}%`;
         hand.style.clipPath = "polygon(50% 0%, 100% 88%, 50% 100%, 0% 88%)";
       }
 
-      if (theme.handType === "thin") {
-        hand.style.width = name === "hour" ? "1.1%" : "0.75%";
+      if (handType === "thin") {
+        hand.style.width = `${getHandWidthPercent(theme, name)}%`;
         hand.style.borderRadius = "999px";
       }
 
-      if (theme.handType === "taper") {
-        hand.style.width = name === "hour" ? "2.8%" : "1.8%";
+      if (handType === "taper") {
+        hand.style.width = `${getHandWidthPercent(theme, name)}%`;
         hand.style.clipPath = "polygon(50% 0%, 82% 100%, 18% 100%)";
       }
 
@@ -1753,7 +1996,10 @@
       bindings.forEach(([key, type]) => {
         els[key].addEventListener("focus", beginHistoryChange);
         els[key].addEventListener("pointerdown", beginHistoryChange);
-        els[key].addEventListener("change", commitHistoryChange);
+        els[key].addEventListener("change", () => {
+          commitHistoryChange();
+          saveSettings({ notify: true });
+        });
         els[key].addEventListener("input", event => {
           beginHistoryChange();
           state[key] = type === "number"
@@ -1783,12 +2029,14 @@
         if (file) importSettingsJson(file);
       });
       els.saveSlot.addEventListener("click", saveSelectedSlot);
-      els.loadSlot.addEventListener("click", loadSelectedSlot);
       els.clearSlot.addEventListener("click", clearSelectedSlot);
       els.slotSelect.addEventListener("change", event => {
         changeSelectedSlot(event.target.value);
       });
       els.newProject.addEventListener("click", createNewProject);
+      bindSectionOpenState(els.imageSection, "imageSectionOpen");
+      bindSectionOpenState(els.clockSection, "clockSectionOpen");
+      bindSectionOpenState(els.textSection, "textSectionOpen");
       window.addEventListener("keydown", handleKeyboardShortcuts);
       bindImageDrag();
     }
@@ -1816,7 +2064,7 @@
         return;
       }
 
-      if (/^[1-5]$/.test(key)) {
+      if (/^[1-6]$/.test(key)) {
         event.preventDefault();
         changeSelectedSlot(key);
         return;
@@ -1841,9 +2089,8 @@
     }
 
     async function downloadPng() {
-      if (document.fonts?.ready) {
-        await document.fonts.ready;
-      }
+      render();
+      await waitForExportAssets();
 
       const size = Number(els.exportSize.value);
       const output = document.createElement("canvas");
@@ -1864,15 +2111,37 @@
       drawExportRing(context, theme, centerX, centerY, ringRadius, size);
       drawExportTicks(context, theme, centerX, centerY, ringRadius, size);
       drawExportHands(context, theme, centerX, centerY, ringRadius, size);
-      drawExportLabel(context, centerX, centerY, clockDiameter, size);
+      drawExportLabel(context, centerX, centerY, clockDiameter);
 
       const blob = await new Promise(resolve => output.toBlob(resolve, "image/png"));
       if (!blob) {
-        window.alert("PNG 이미지를 만들지 못했습니다.");
+        showStatus("PNG 이미지를 만들지 못했습니다.", "error");
         return;
       }
 
-      await savePngBlob(blob);
+      const didSave = await savePngBlob(blob);
+      if (didSave) {
+        showStatus("PNG 저장을 완료했습니다.");
+      }
+    }
+
+    async function waitForExportAssets() {
+      if (document.fonts?.ready) {
+        await document.fonts.ready;
+      }
+
+      if (!state.imageUrl || !els.bgImg.src || els.bgImg.complete) return;
+
+      await new Promise(resolve => {
+        const done = () => {
+          els.bgImg.removeEventListener("load", done);
+          els.bgImg.removeEventListener("error", done);
+          resolve();
+        };
+
+        els.bgImg.addEventListener("load", done, { once: true });
+        els.bgImg.addEventListener("error", done, { once: true });
+      });
     }
 
     async function savePngBlob(blob) {
@@ -1890,9 +2159,9 @@
           const writable = await handle.createWritable();
           await writable.write(blob);
           await writable.close();
-          return;
+          return true;
         } catch (error) {
-          if (error.name === "AbortError") return;
+          if (error.name === "AbortError") return false;
           console.warn("파일 저장 선택기를 사용할 수 없어 다운로드 방식으로 전환합니다.", error);
         }
       }
@@ -1903,6 +2172,7 @@
       link.href = url;
       link.click();
       URL.revokeObjectURL(url);
+      return true;
     }
 
     function drawExportBackground(context, size, scale) {
@@ -1939,25 +2209,27 @@
 
     function drawExportRing(context, theme, centerX, centerY, radius, size) {
       const color = getClockColor();
+      const ring = theme.ring;
 
       context.save();
       context.strokeStyle = color;
-      context.lineWidth = size * (theme.ringBorder.startsWith("4px") ? 0.004 : 0.009);
+      context.lineWidth = size * ring.widthPercent;
       context.beginPath();
       context.arc(centerX, centerY, radius, 0, Math.PI * 2);
       context.stroke();
 
-      if (theme.ringBorder.includes("double")) {
-        context.lineWidth = size * 0.003;
+      if (ring.style === "double") {
+        context.lineWidth = size * ring.innerWidthPercent;
         context.beginPath();
-        context.arc(centerX, centerY, radius - (size * 0.009), 0, Math.PI * 2);
+        context.arc(centerX, centerY, radius - (size * ring.innerInsetPercent), 0, Math.PI * 2);
         context.stroke();
       }
       context.restore();
     }
 
     function drawExportTicks(context, theme, centerX, centerY, radius, size) {
-      if (theme.tickType === "none") return;
+      const tickType = getTickType(theme);
+      if (tickType === "none") return;
 
       const color = getClockColor();
 
@@ -1968,14 +2240,15 @@
 
       for (let i = 0; i < 12; i++) {
         const angle = (i * 30 - 90) * Math.PI / 180;
-        const outerRadius = radius * 0.92;
+        const faceDiameter = radius * 2;
+        const tickCenterRadius = faceDiameter * (TICK_RADIUS_PERCENT / 100);
 
-        if (theme.tickType === "dot") {
+        if (tickType === "dot") {
           context.beginPath();
           context.arc(
-            centerX + Math.cos(angle) * outerRadius,
-            centerY + Math.sin(angle) * outerRadius,
-            size * 0.011,
+            centerX + Math.cos(angle) * tickCenterRadius,
+            centerY + Math.sin(angle) * tickCenterRadius,
+            faceDiameter * (DOT_TICK_SIZE_PERCENT / 100) / 2,
             0,
             Math.PI * 2
           );
@@ -1983,15 +2256,16 @@
           continue;
         }
 
-        context.lineWidth = size * 0.012;
+        context.lineWidth = faceDiameter * (BAR_TICK_WIDTH_PERCENT / 100);
+        const tickHalfLength = faceDiameter * (BAR_TICK_HEIGHT_PERCENT / 100) / 2;
         context.beginPath();
         context.moveTo(
-          centerX + Math.cos(angle) * outerRadius,
-          centerY + Math.sin(angle) * outerRadius
+          centerX + Math.cos(angle) * (tickCenterRadius + tickHalfLength),
+          centerY + Math.sin(angle) * (tickCenterRadius + tickHalfLength)
         );
         context.lineTo(
-          centerX + Math.cos(angle) * (outerRadius - radius * 0.10),
-          centerY + Math.sin(angle) * (outerRadius - radius * 0.10)
+          centerX + Math.cos(angle) * (tickCenterRadius - tickHalfLength),
+          centerY + Math.sin(angle) * (tickCenterRadius - tickHalfLength)
         );
         context.stroke();
       }
@@ -2002,56 +2276,96 @@
       const hourAngle = (((state.hour % 12) * 30) + (state.minute * 0.5) - 90) * Math.PI / 180;
       const minuteAngle = ((state.minute * 6) - 90) * Math.PI / 180;
 
-      drawExportHand(context, theme, centerX, centerY, radius * 0.54, hourAngle, size * 0.018);
-      drawExportHand(context, theme, centerX, centerY, radius * 0.72, minuteAngle, size * 0.012);
+      const faceDiameter = radius * 2;
+      drawExportHand(
+        context,
+        theme,
+        centerX,
+        centerY,
+        faceDiameter * (HOUR_HAND_LENGTH_PERCENT / 100),
+        hourAngle,
+        faceDiameter * (getHandWidthPercent(theme, "hour") / 100)
+      );
+      drawExportHand(
+        context,
+        theme,
+        centerX,
+        centerY,
+        faceDiameter * (MINUTE_HAND_LENGTH_PERCENT / 100),
+        minuteAngle,
+        faceDiameter * (getHandWidthPercent(theme, "minute") / 100)
+      );
 
-      context.save();
-      context.fillStyle = getClockColor();
-      context.beginPath();
-      context.arc(centerX, centerY, size * 0.015, 0, Math.PI * 2);
-      context.fill();
-      context.restore();
+      if (theme.centerDot) {
+        context.save();
+        context.fillStyle = getClockColor();
+        context.beginPath();
+        context.arc(centerX, centerY, faceDiameter * (CENTER_DOT_SIZE_PERCENT / 100) / 2, 0, Math.PI * 2);
+        context.fill();
+        context.restore();
+      }
     }
 
     function drawExportHand(context, theme, centerX, centerY, length, angle, width) {
+      const handType = getHandType(theme);
+
       context.save();
+      context.translate(centerX, centerY);
+      context.rotate(angle + Math.PI / 2);
+      context.fillStyle = getClockColor();
       context.strokeStyle = getClockColor();
-      context.lineWidth = width;
-      context.lineCap = theme.handType === "thin" ? "butt" : "round";
-      context.beginPath();
-      context.moveTo(centerX, centerY);
-      context.lineTo(centerX + Math.cos(angle) * length, centerY + Math.sin(angle) * length);
-      context.stroke();
+
+      if (handType === "diamond") {
+        context.beginPath();
+        context.moveTo(0, -length);
+        context.lineTo(width / 2, -length * 0.12);
+        context.lineTo(0, 0);
+        context.lineTo(-width / 2, -length * 0.12);
+        context.closePath();
+        context.fill();
+      } else if (handType === "taper") {
+        context.beginPath();
+        context.moveTo(0, -length);
+        context.lineTo(width * 0.32, 0);
+        context.lineTo(-width * 0.32, 0);
+        context.closePath();
+        context.fill();
+      } else {
+        context.lineWidth = width;
+        context.lineCap = handType === "thin" ? "butt" : "round";
+        context.beginPath();
+        context.moveTo(0, 0);
+        context.lineTo(0, -length);
+        context.stroke();
+      }
+
       context.restore();
     }
 
-    function drawExportLabel(context, centerX, centerY, clockDiameter, size) {
+    function drawExportLabel(context, centerX, centerY, clockDiameter) {
       const text = getLabelText();
-      const fontSize = clockDiameter * 0.062 * (state.labelFontSize / 100);
-      const radius = clockDiameter * ((45 + Number(state.labelGap)) / 100);
-      const centerAngle = -Math.PI / 2 + (Number(state.labelOffset) * Math.PI / 180);
+      const geometry = getLabelGeometry(clockDiameter);
 
       context.save();
-      context.font =
-        `${state.labelItalic ? "italic " : ""}${getLabelFontWeight()} ${fontSize}px ${getLabelFontFamily()}`;
+      context.font = getLabelFontCss(geometry.fontSize);
       context.textAlign = "center";
-      context.textBaseline = "middle";
+      context.textBaseline = "alphabetic";
       context.lineJoin = "round";
       context.strokeStyle = state.labelStrokeColor;
-      context.lineWidth = size * (state.labelFillNone ? 0.005 : 0.010);
+      context.lineWidth = geometry.strokeWidth;
       context.fillStyle = state.labelFillColor;
 
       const correctedWidths = Array.from(text, char => context.measureText(char).width);
-      const totalAngle = correctedWidths.reduce((sum, width) => sum + width / radius, 0);
-      let angle = centerAngle - (totalAngle / 2);
+      const totalAngle = correctedWidths.reduce((sum, width) => sum + width / geometry.radius, 0);
+      let angle = geometry.centerAngle - (totalAngle / 2);
 
       Array.from(text).forEach((char, index) => {
-        const charAngle = correctedWidths[index] / radius;
+        const charAngle = correctedWidths[index] / geometry.radius;
         angle += charAngle / 2;
         context.save();
         context.translate(
-          centerX + Math.cos(angle) * radius,
-          centerY + Math.sin(angle) * radius
+          centerX + Math.cos(angle) * geometry.radius,
+          centerY + Math.sin(angle) * geometry.radius
         );
         context.rotate(angle + Math.PI / 2);
         if (!state.labelStrokeNone) {
@@ -2094,12 +2408,35 @@
       return `${String(state.hour).padStart(2, "0")}:${String(state.minute).padStart(2, "0")}`;
     }
 
+    function formatTimestamp(date = new Date()) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const hour = String(date.getHours()).padStart(2, "0");
+      const minute = String(date.getMinutes()).padStart(2, "0");
+      const second = String(date.getSeconds()).padStart(2, "0");
+      return `${year}${month}${day}-${hour}${minute}${second}`;
+    }
+
+    function sanitizeFilenamePart(value, fallback = "clock") {
+      const sanitized = String(value || "")
+        .trim()
+        .replace(/[\\/:*?"<>|]/g, "")
+        .replace(/\s+/g, "_")
+        .replace(/_+/g, "_")
+        .slice(0, 60);
+
+      return sanitized || fallback;
+    }
+
     function getPngFilename() {
-      return `clock-${formatTime().replace(":", "-")}.png`;
+      const label = sanitizeFilenamePart(state.labelText || getLabelText());
+      return `${label}_${formatTimestamp()}.png`;
     }
 
     async function initialize() {
       await loadSettings();
+      setActiveSlotBaseline();
       syncControlsFromState();
       updateImageControlRange();
       bindControls();
