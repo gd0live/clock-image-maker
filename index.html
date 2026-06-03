@@ -83,11 +83,11 @@
     }
 
     .section-clock {
-      order: 4;
+      order: 3;
     }
 
     .section-text {
-      order: 3;
+      order: 4;
     }
 
     details.section summary {
@@ -291,6 +291,16 @@
       margin-bottom: 4px;
       color: #ccc;
       font-size: 12px;
+    }
+
+    .time-picker select {
+      width: 100%;
+      height: 32px;
+      padding: 6px 8px;
+      border: 1px solid #555;
+      border-radius: 6px;
+      background: #111;
+      color: white;
     }
 
     .field label {
@@ -556,33 +566,21 @@
             <option value="4">슬롯 4</option>
             <option value="5">슬롯 5</option>
           </select>
-          <button
-            id="saveSlot"
-            class="button button-secondary icon-button"
-            type="button"
-            title="선택 슬롯에 저장"
+          <button id="saveSlot" class="button button-secondary icon-button" type="button" title="선택 슬롯에 저장"
             aria-label="선택 슬롯에 저장">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M5 4h12l2 2v14H5z" />
               <path d="M8 4v6h8V4M8 20v-6h8v6" />
             </svg>
           </button>
-          <button
-            id="loadSlot"
-            class="button button-secondary icon-button"
-            type="button"
-            title="선택 슬롯 불러오기"
+          <button id="loadSlot" class="button button-secondary icon-button" type="button" title="선택 슬롯 불러오기"
             aria-label="선택 슬롯 불러오기">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M3 19V6h7l2 3h9v10z" />
               <path d="m9 14 3-3 3 3M12 11v6" />
             </svg>
           </button>
-          <button
-            id="clearSlot"
-            class="button button-secondary icon-button"
-            type="button"
-            title="선택 슬롯 초기화"
+          <button id="clearSlot" class="button button-secondary icon-button" type="button" title="선택 슬롯 초기화"
             aria-label="선택 슬롯 초기화">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M4 7h16M10 11v6M14 11v6M6 7l1 14h10l1-14M9 7V4h6v3" />
@@ -590,15 +588,15 @@
           </button>
         </div>
         <div class="save-row save-tools">
-          <button id="undo" class="button button-secondary icon-button" type="button" title="실행취소"
-            aria-label="실행취소" disabled>
+          <button id="undo" class="button button-secondary icon-button" type="button" title="실행취소" aria-label="실행취소"
+            disabled>
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M9 7 4 12l5 5" />
               <path d="M5 12h9a6 6 0 0 1 6 6" />
             </svg>
           </button>
-          <button id="redo" class="button button-secondary icon-button" type="button" title="다시실행"
-            aria-label="다시실행" disabled>
+          <button id="redo" class="button button-secondary icon-button" type="button" title="다시실행" aria-label="다시실행"
+            disabled>
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="m15 7 5 5-5 5" />
               <path d="M19 12h-9a6 6 0 0 0-6 6" />
@@ -937,6 +935,8 @@
       clock: $("clock")
     };
 
+    let activeSlotValue = els.slotSelect.value;
+
     function clamp(value, min, max) {
       return Math.max(min, Math.min(max, Number(value)));
     }
@@ -1144,6 +1144,75 @@
       db.close();
     }
 
+    function normalizeSlotSnapshot(snapshot) {
+      const normalized = {
+        ...createDefaultState(),
+        ...(snapshot || {})
+      };
+      delete normalized.savedAt;
+      normalized.labelGap = clamp(normalized.labelGap, -3, 3);
+      return normalized;
+    }
+
+    async function hasUnsavedChangesForSlot(slotValue) {
+      const cached = await readSettingsKey(`slot-${slotValue}`);
+      return !snapshotsEqual(
+        normalizeSlotSnapshot(cached),
+        normalizeSlotSnapshot(state)
+      );
+    }
+
+    function getSlotLabel(slotValue) {
+      const option = Array.from(els.slotSelect.options)
+        .find(item => item.value === String(slotValue));
+      return option?.textContent || `슬롯 ${slotValue}`;
+    }
+
+    async function changeSelectedSlot(nextValue) {
+      const previousValue = activeSlotValue;
+      if (String(nextValue) === String(previousValue)) return;
+
+      try {
+        const hasUnsaved = await hasUnsavedChangesForSlot(previousValue);
+        if (hasUnsaved) {
+          const shouldChange = window.confirm(
+            `${getSlotLabel(previousValue)}에 현재 작업이 저장되어 있지 않습니다. ${getSlotLabel(nextValue)}로 변경할까요?`
+          );
+
+          if (!shouldChange) {
+            els.slotSelect.value = previousValue;
+            return;
+          }
+        }
+
+        els.slotSelect.value = nextValue;
+        activeSlotValue = String(nextValue);
+        const nextSlot = await readSettingsKey(`slot-${nextValue}`);
+        if (!nextSlot) {
+          window.alert(`${getSlotLabel(nextValue)}에 저장된 작업이 없습니다.`);
+          return;
+        }
+
+        applySlotSnapshot(nextSlot);
+        await saveSettings();
+      } catch (error) {
+        console.warn("슬롯 변경 확인에 실패했습니다.", error);
+        els.slotSelect.value = previousValue;
+        activeSlotValue = previousValue;
+        window.alert("슬롯 상태를 확인하지 못했습니다.");
+      }
+    }
+
+    function applySlotSnapshot(snapshot) {
+      pushUndoSnapshot();
+      Object.assign(state, createDefaultState(), snapshot);
+      state.labelGap = clamp(state.labelGap, -3, 3);
+      syncControlsFromState();
+      populateTimePicker();
+      updateImageControlRange();
+      render();
+    }
+
     async function saveSelectedSlot() {
       const slotLabel = els.slotSelect.options[els.slotSelect.selectedIndex].textContent;
       const shouldSave = window.confirm(`${slotLabel}에 현재 작업을 저장할까요? 기존 슬롯 내용은 덮어씁니다.`);
@@ -1171,13 +1240,7 @@
           return;
         }
 
-        pushUndoSnapshot();
-        Object.assign(state, createDefaultState(), cached);
-        state.labelGap = clamp(state.labelGap, -3, 3);
-        syncControlsFromState();
-        populateTimePicker();
-        updateImageControlRange();
-        render();
+        applySlotSnapshot(cached);
         await saveSettings();
       } catch (error) {
         console.warn("슬롯 불러오기에 실패했습니다.", error);
@@ -1722,8 +1785,59 @@
       els.saveSlot.addEventListener("click", saveSelectedSlot);
       els.loadSlot.addEventListener("click", loadSelectedSlot);
       els.clearSlot.addEventListener("click", clearSelectedSlot);
+      els.slotSelect.addEventListener("change", event => {
+        changeSelectedSlot(event.target.value);
+      });
       els.newProject.addEventListener("click", createNewProject);
+      window.addEventListener("keydown", handleKeyboardShortcuts);
       bindImageDrag();
+    }
+
+    function handleKeyboardShortcuts(event) {
+      if (!event.ctrlKey || event.altKey || event.metaKey) return;
+
+      const key = event.key.toLowerCase();
+
+      if (key === "s") {
+        event.preventDefault();
+        downloadPng();
+        return;
+      }
+
+      if (key === "o") {
+        event.preventDefault();
+        els.file.click();
+        return;
+      }
+
+      if (key === "n") {
+        event.preventDefault();
+        createNewProject();
+        return;
+      }
+
+      if (/^[1-5]$/.test(key)) {
+        event.preventDefault();
+        changeSelectedSlot(key);
+        return;
+      }
+
+      if (key === "z" && event.shiftKey) {
+        event.preventDefault();
+        redoSettings();
+        return;
+      }
+
+      if (key === "z") {
+        event.preventDefault();
+        undoSettings();
+        return;
+      }
+
+      if (key === "y") {
+        event.preventDefault();
+        redoSettings();
+      }
     }
 
     async function downloadPng() {
