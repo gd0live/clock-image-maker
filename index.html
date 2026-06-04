@@ -533,6 +533,9 @@
       top: 0;
       z-index: 12;
       width: 100%;
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
       border-bottom: 1px solid #343434;
       background: #202020;
       box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
@@ -772,9 +775,11 @@
       grid-template-rows: auto minmax(0, 1fr);
       place-items: stretch;
       align-content: stretch;
+      min-width: 0;
+      min-height: 0;
       gap: 12px;
       padding: 0;
-      overflow: auto;
+      overflow: hidden;
     }
 
     .preview-stage {
@@ -782,6 +787,7 @@
       place-items: center;
       min-height: 0;
       padding: 32px;
+      overflow: auto;
     }
 
     .preview-toolbar {
@@ -914,6 +920,7 @@
       top: 54%;
       width: var(--clock-size);
       height: var(--clock-size);
+      container-type: size;
       transform: translate(-50%, -50%);
       z-index: 3;
       pointer-events: none;
@@ -947,7 +954,7 @@
       top: 50%;
       color: var(--clock-color);
       font-family: Pretendard, "Noto Sans KR", sans-serif;
-      font-size: clamp(12px, 5.2cqw, 34px);
+      font-size: var(--date-marker-font-size, 5.2cqw);
       font-weight: 900;
       line-height: 1;
       paint-order: stroke;
@@ -1052,6 +1059,26 @@
         display: block;
       }
 
+      .editor-menubar {
+        flex-wrap: wrap;
+        height: auto;
+        min-height: 34px;
+        padding: 4px 6px;
+        overflow-x: visible;
+      }
+
+      .editor-menu-button {
+        flex: 1 1 calc(33.333% - 4px);
+        min-width: 86px;
+        max-width: none;
+        padding: 0 6px;
+      }
+
+      .editor-menu-button svg {
+        width: 15px;
+        height: 15px;
+      }
+
       .preview {
         width: calc(100vw - 28px);
         min-height: 100dvh;
@@ -1060,11 +1087,12 @@
       }
 
       .preview-stage {
-        padding: 72px 14px 18px;
+        min-height: 0;
+        padding: 18px 14px;
       }
 
       .canvas {
-        width: min(calc(94vw - 28px), 94dvh);
+        width: var(--preview-size, min(calc(94vw - 28px), 94dvh));
       }
 
       .toast {
@@ -1312,7 +1340,7 @@
               <path d="M5 4h12l2 2v14H5z" />
               <path d="M8 4v6h8V4M8 20v-6h8v6" />
             </svg>
-            <span>저장</span>
+            <span>브라우저에 저장</span>
           </button>
           <button class="editor-menu-button" type="button" data-menu-command="export">
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -1396,6 +1424,7 @@
     const MONTH_MARKER_LENGTH_PERCENT = 32;
     const CENTER_DOT_SIZE_PERCENT = 3.5;
     const LABEL_FONT_SIZE_PERCENT = 6.2;
+    const DATE_MARKER_FONT_SIZE_PERCENT = 5.2;
     const LABEL_RADIUS_BASE_PERCENT = 45;
     const LABEL_START_OFFSET_BASE_PERCENT = 50;
     const LABEL_OFFSET_TO_ANGLE_RATIO = Math.PI / 100;
@@ -1721,6 +1750,12 @@
         ?.toggleAttribute("disabled", redoDisabled);
     }
 
+    function updateSaveButtonState() {
+      els.editorMenubar
+        ?.querySelector("[data-menu-command='save']")
+        ?.toggleAttribute("disabled", !isActiveSlotDirty());
+    }
+
     function showStatus(message, type = "info", duration = 2000) {
       window.clearTimeout(statusTimer);
       window.clearTimeout(cacheStatusTimer);
@@ -2003,6 +2038,7 @@
       if (!els.slotTabs) return;
 
       const activeIsDirty = isActiveSlotDirty();
+      updateSaveButtonState();
       els.slotTabs.textContent = "";
 
       openSlotValues = getOpenSlotValues();
@@ -2206,9 +2242,9 @@
     }
 
     async function saveSelectedSlot() {
+      if (!isActiveSlotDirty()) return;
+
       const slotLabel = getSlotLabel(activeSlotValue);
-      const shouldSave = window.confirm(`${slotLabel}에 현재 작업을 저장할까요? 기존 내용은 덮어씁니다.`);
-      if (!shouldSave) return;
 
       try {
         await writeSettingsKey(getSelectedSlotKey(), {
@@ -2216,10 +2252,11 @@
           savedAt: new Date().toISOString()
         });
         setActiveSlotBaseline();
-        showStatus(`${slotLabel}에 저장했습니다.`);
+        updateSaveButtonState();
+        showStatus(`${slotLabel}을 브라우저에 저장했습니다.`);
       } catch (error) {
         console.warn("작업 탭 저장에 실패했습니다.", error);
-        showStatus("작업 탭에 저장하지 못했습니다.", "error");
+        showStatus("작업 탭을 브라우저에 저장하지 못했습니다.", "error");
       }
     }
 
@@ -2490,6 +2527,12 @@
       return Math.round(Math.min(availableWidth, availableHeight, 900));
     }
 
+    function getPreviewRenderScale() {
+      const fitSize = getPreviewFitSize();
+      const canvasSize = els.canvas.getBoundingClientRect().width || fitSize;
+      return fitSize ? canvasSize / fitSize : 1;
+    }
+
     function bindSectionOpenState(section, key) {
       section.addEventListener("toggle", () => {
         state[key] = section.open;
@@ -2617,7 +2660,7 @@
     }
 
     function getRingBorder(theme) {
-      return `${theme.ring.widthPx}px ${theme.ring.style} ${getClockColor()}`;
+      return `${theme.ring.widthPercent * 100}cqw ${theme.ring.style} ${getClockColor()}`;
     }
 
     function getTickType(theme) {
@@ -2638,8 +2681,8 @@
       return name === "hour" ? 2.5 : 1.5;
     }
 
-    function getDateMarkerFontSize(faceDiameter) {
-      return Math.max(12, faceDiameter * 0.062);
+    function getDateMarkerFontSize(clockDiameter) {
+      return clockDiameter * (DATE_MARKER_FONT_SIZE_PERCENT / 100);
     }
 
     function getDateMarkerRadiusPercents(theme = themes[state.theme]) {
@@ -2691,14 +2734,16 @@
 
       els.clock.style.setProperty("--clock-size", `${DEFAULT_CLOCK_SIZE}%`);
       els.clock.style.setProperty("--ring-size", `${ringSize}%`);
+      els.clock.style.setProperty("--date-marker-font-size", `${DATE_MARKER_FONT_SIZE_PERCENT}cqw`);
       els.bg.style.backgroundImage = state.imageUrl
         ? "none"
         : "linear-gradient(135deg, #642020, #2d2d2d)";
 
       els.bgImg.src = state.imageUrl;
       els.bgImg.style.display = state.imageUrl ? "block" : "none";
-      els.bg.style.setProperty("--image-x", `${state.imageX}px`);
-      els.bg.style.setProperty("--image-y", `${state.imageY}px`);
+      const previewScale = getPreviewRenderScale();
+      els.bg.style.setProperty("--image-x", `${state.imageX * previewScale}px`);
+      els.bg.style.setProperty("--image-y", `${state.imageY * previewScale}px`);
       els.bg.style.setProperty("--image-scale", state.imageScale / 100);
 
       updateOutsideMask(DEFAULT_CLOCK_SIZE, ringSize);
@@ -2731,7 +2776,7 @@
     }
 
     function updateImageControlRange() {
-      const canvasSize = document.querySelector(".canvas").getBoundingClientRect().width;
+      const canvasSize = getPreviewFitSize();
       const renderedSize = canvasSize * (state.imageScale / 100);
       const limit = Math.round(renderedSize / 3);
 
@@ -2822,8 +2867,9 @@
       els.canvas.addEventListener("pointermove", event => {
         if (!drag) return;
 
-        state.imageX = Math.round(drag.imageX + event.clientX - drag.startX);
-        state.imageY = Math.round(drag.imageY + event.clientY - drag.startY);
+        const previewScale = getPreviewRenderScale();
+        state.imageX = Math.round(drag.imageX + ((event.clientX - drag.startX) / previewScale));
+        state.imageY = Math.round(drag.imageY + ((event.clientY - drag.startY) / previewScale));
         clampImagePosition();
         syncImagePositionControls();
         render();
@@ -3243,7 +3289,12 @@
 
       if (key === "s") {
         event.preventDefault();
-        downloadImage();
+        if (event.shiftKey) {
+          downloadImage();
+          return;
+        }
+
+        saveSelectedSlot();
         return;
       }
 
@@ -3255,7 +3306,7 @@
 
       if (key === "n") {
         event.preventDefault();
-        createNewProject();
+        addSlotTab();
         return;
       }
 
@@ -3402,8 +3453,8 @@
 
     function drawExportScene(context, size, backgroundImage = null) {
       const theme = themes[state.theme];
-      const screenSize = $("canvas").getBoundingClientRect().width || size;
-      const scale = size / screenSize;
+      const referenceSize = getPreviewFitSize();
+      const scale = size / referenceSize;
       const centerX = size / 2;
       const centerY = size * (CLOCK_CENTER_Y / 100);
       const clockDiameter = size * (DEFAULT_CLOCK_SIZE / 100);
@@ -3411,9 +3462,9 @@
 
       drawExportBackground(context, size, scale, backgroundImage);
       drawExportOutsideMask(context, size, centerX, centerY, ringRadius);
-      drawExportRing(context, theme, centerX, centerY, ringRadius, size);
+      drawExportRing(context, theme, centerX, centerY, ringRadius, clockDiameter);
       drawExportTicks(context, theme, centerX, centerY, ringRadius, size);
-      drawExportHands(context, theme, centerX, centerY, ringRadius, size);
+      drawExportHands(context, theme, centerX, centerY, ringRadius, clockDiameter);
       drawExportLabel(context, centerX, centerY, clockDiameter);
     }
 
@@ -3507,21 +3558,21 @@
       context.restore();
     }
 
-    function drawExportRing(context, theme, centerX, centerY, radius, size) {
+    function drawExportRing(context, theme, centerX, centerY, radius, clockDiameter) {
       const color = getClockColor();
       const ring = theme.ring;
 
       context.save();
       context.strokeStyle = color;
-      context.lineWidth = size * ring.widthPercent;
+      context.lineWidth = clockDiameter * ring.widthPercent;
       context.beginPath();
       context.arc(centerX, centerY, radius, 0, Math.PI * 2);
       context.stroke();
 
       if (ring.style === "double") {
-        context.lineWidth = size * ring.innerWidthPercent;
+        context.lineWidth = clockDiameter * ring.innerWidthPercent;
         context.beginPath();
-        context.arc(centerX, centerY, radius - (size * ring.innerInsetPercent), 0, Math.PI * 2);
+        context.arc(centerX, centerY, radius - (clockDiameter * ring.innerInsetPercent), 0, Math.PI * 2);
         context.stroke();
       }
       context.restore();
@@ -3572,9 +3623,9 @@
       context.restore();
     }
 
-    function drawExportHands(context, theme, centerX, centerY, radius, size) {
+    function drawExportHands(context, theme, centerX, centerY, radius, clockDiameter) {
       if (state.dateMarkers) {
-        drawExportDateMarkers(context, centerX, centerY, radius);
+        drawExportDateMarkers(context, theme, centerX, centerY, radius, clockDiameter);
 
         if (theme.centerDot) {
           context.save();
@@ -3621,9 +3672,13 @@
       }
     }
 
-    function drawExportDateMarkers(context, centerX, centerY, radius) {
+    function drawExportDateMarkers(context, theme, centerX, centerY, radius, clockDiameter) {
       const faceDiameter = radius * 2;
-      const fontSize = getDateMarkerFontSize(faceDiameter);
+      const borderWidth = clockDiameter * theme.ring.widthPercent;
+      const contentDiameter = Math.max(1, faceDiameter - (borderWidth * 2));
+      const contentLeft = centerX - radius + borderWidth;
+      const contentTop = centerY - radius + borderWidth;
+      const fontSize = getDateMarkerFontSize(clockDiameter);
 
       context.save();
       context.font = `900 ${fontSize}px Pretendard, "Noto Sans KR", sans-serif`;
@@ -3634,9 +3689,9 @@
       context.strokeStyle = "rgba(0, 0, 0, 0.72)";
       context.fillStyle = getClockColor();
 
-      getDateMarkerPositions(faceDiameter).forEach(marker => {
-        const x = centerX - radius + marker.x;
-        const y = centerY - radius + marker.y;
+      getDateMarkerPositions(contentDiameter).forEach(marker => {
+        const x = contentLeft + marker.x;
+        const y = contentTop + marker.y;
         context.strokeText(marker.text, x, y);
         context.fillText(marker.text, x, y);
       });
