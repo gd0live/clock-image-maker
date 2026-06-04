@@ -258,6 +258,38 @@
       margin-bottom: 10px;
     }
 
+    .text-format-toolbar {
+      grid-template-columns: 60px repeat(6, 32px);
+    }
+
+    .text-input-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 44px;
+      gap: 8px;
+      align-items: end;
+      margin-bottom: 10px;
+    }
+
+    .text-input-row .field {
+      margin-bottom: 0;
+    }
+
+    .text-input-row .format-field {
+      display: block;
+      min-width: 0;
+    }
+
+    .text-input-row .format-field span {
+      display: block;
+      margin-bottom: 4px;
+      overflow: hidden;
+      color: #ccc;
+      font-size: 11px;
+      text-align: center;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
     .label-toolbar label {
       display: block;
       min-width: 0;
@@ -414,7 +446,7 @@
     }
 
     .save-output {
-      grid-template-columns: minmax(0, 1fr) 112px;
+      grid-template-columns: minmax(0, 1fr) 136px;
       align-items: end;
     }
 
@@ -428,6 +460,72 @@
       margin-top: 0;
       padding: 6px;
       font-size: 13px;
+    }
+
+    .download-menu {
+      position: relative;
+      display: block;
+    }
+
+    .download-menu .button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border-radius: 10px;
+    }
+
+    .download-caret {
+      width: 13px;
+      height: 13px;
+      fill: none;
+      stroke: currentColor;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 2.4;
+    }
+
+    .download-options {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 6px);
+      z-index: 60;
+      width: 100%;
+      padding: 4px;
+      border: 1px solid #555;
+      border-radius: 8px;
+      background: #111;
+      box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4);
+    }
+
+    .download-options[hidden] {
+      display: none;
+    }
+
+    .download-options button {
+      display: block;
+      width: 100%;
+      height: 30px;
+      padding: 6px 8px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: #ddd;
+      cursor: pointer;
+      font: inherit;
+      font-size: 12px;
+      text-align: left;
+    }
+
+    .download-options button:hover,
+    .download-options button[aria-checked="true"] {
+      background: #333;
+      color: #f1d6a8;
+    }
+
+    .download-options button:disabled {
+      cursor: not-allowed;
+      opacity: 0.45;
     }
 
     .save-tools .icon-button,
@@ -577,6 +675,16 @@
       cursor: grabbing;
     }
 
+    .canvas.is-drop-target::after {
+      content: "";
+      position: absolute;
+      inset: 10px;
+      z-index: 8;
+      border: 2px dashed rgba(255, 228, 183, 0.9);
+      background: rgba(0, 0, 0, 0.18);
+      pointer-events: none;
+    }
+
     .bg {
       position: absolute;
       inset: 0;
@@ -593,7 +701,7 @@
 
       width: 100%;
       height: 100%;
-      object-fit: cover;
+      object-fit: contain;
 
       transform: translate(-50%, -50%) translate(var(--image-x), var(--image-y)) scale(var(--image-scale));
       transform-origin: center center;
@@ -640,6 +748,24 @@
       left: 50%;
       top: 50%;
       transform-origin: 50% 100%;
+    }
+
+    .date-marker {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      color: var(--clock-color);
+      font-family: Pretendard, "Noto Sans KR", sans-serif;
+      font-size: clamp(12px, 5.2cqw, 34px);
+      font-weight: 900;
+      line-height: 1;
+      paint-order: stroke;
+      pointer-events: none;
+      text-shadow:
+        0 0 2px rgba(0, 0, 0, 0.72),
+        0 1px 4px rgba(0, 0, 0, 0.55);
+      transform: translate(-50%, -50%);
+      white-space: nowrap;
     }
 
     .center-dot {
@@ -732,7 +858,7 @@
 
     <aside id="settingsPanel" class="panel">
       <h1>시계 설정</h1>
-      <p class="hint">배경 그림을 넣고 시계 모양과 시간을 조절한 뒤 PNG로 저장하세요.</p>
+      <p class="hint">배경 그림을 넣고 시계 모양과 시간을 조절한 뒤 이미지로 저장하세요.</p>
 
       <section class="section section-save">
         <h2>저장</h2>
@@ -746,7 +872,19 @@
               <option value="2048">2048 x 2048</option>
             </select>
           </label>
-          <button id="download" class="button" type="button">PNG 저장</button>
+          <div id="exportFormatMenu" class="download-menu">
+            <button id="download" class="button" type="button" aria-haspopup="true" aria-expanded="false"
+              aria-controls="exportFormatList">
+              <span id="downloadLabel">PNG 저장</span>
+              <svg class="download-caret" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+            <div id="exportFormatList" class="download-options" role="menu" hidden>
+              <button type="button" role="menuitemradio" data-export-format="png" aria-checked="true">PNG 저장</button>
+              <button type="button" role="menuitemradio" data-export-format="webm" aria-checked="false">WEBM 저장</button>
+            </div>
+          </div>
         </div>
 
         <div class="save-row slot-tools">
@@ -854,8 +992,8 @@
             <select id="pickerMinute"></select>
           </label>
           <label>
-            <span>시간표시</span>
-            <button id="includeTime" class="format-toggle" type="button" aria-pressed="false"><i>T</i></button>
+            <span>월일표시</span>
+            <button id="dateMarkers" class="format-toggle" type="button" aria-pressed="false">月</button>
           </label>
         </div>
 
@@ -893,9 +1031,15 @@
       <details id="textSection" class="section section-text" open>
         <summary>텍스트</summary>
 
-        <div class="field">
-          <label>텍스트</label>
-          <input id="labelText" type="text" value="설홍시" />
+        <div class="text-input-row">
+          <div class="field">
+            <label>텍스트</label>
+            <input id="labelText" type="text" value="설홍시" />
+          </div>
+          <label class="format-field">
+            <span>시간표시</span>
+            <button id="includeTime" class="format-toggle" type="button" aria-pressed="false"><i>T</i></button>
+          </label>
         </div>
 
         <div class="field">
@@ -918,7 +1062,7 @@
           <input id="labelFont" type="text" value="Pretendard, 'Noto Sans KR', sans-serif" />
         </div>
 
-        <div class="label-toolbar">
+        <div class="label-toolbar text-format-toolbar">
           <label>
             <span>크기</span>
             <select id="labelFontSize">
@@ -1014,6 +1158,7 @@
     const DOT_TICK_SIZE_PERCENT = 2.8;
     const HOUR_HAND_LENGTH_PERCENT = 27;
     const MINUTE_HAND_LENGTH_PERCENT = 36;
+    const MONTH_MARKER_LENGTH_PERCENT = 32;
     const CENTER_DOT_SIZE_PERCENT = 3.5;
     const LABEL_FONT_SIZE_PERCENT = 6.2;
     const LABEL_RADIUS_BASE_PERCENT = 45;
@@ -1030,6 +1175,7 @@
 
       return {
         imageUrl: "",
+        imageMime: "",
         imageX: 0,
         imageY: 0,
         imageScale: 100,
@@ -1051,12 +1197,14 @@
         hour: (now.getHours() % 12) || 12,
         minute: now.getMinutes(),
         includeTime: true,
+        dateMarkers: false,
 
         theme: "classic",
         clockColor: "#fff8ec",
 
         outsideColor: "#000000",
         outsideOpacity: 0.30,
+        exportFormat: "png",
         previewZoom: "fit",
         clockSectionOpen: true,
         textSectionOpen: true
@@ -1074,6 +1222,7 @@
     let cacheStatusTimer = null;
     let settingsSaveVersion = 0;
     let activeSlotBaselineSnapshot = null;
+    let isExporting = false;
 
     const themes = {
       classic: {
@@ -1168,6 +1317,7 @@
       pickerHour: $("pickerHour"),
       pickerMinute: $("pickerMinute"),
       includeTime: $("includeTime"),
+      dateMarkers: $("dateMarkers"),
       theme: $("theme"),
       clockColor: $("clockColor"),
       outsideColor: $("outsideColor"),
@@ -1176,7 +1326,10 @@
       previewZoom: $("previewZoom"),
       previewZoomValue: $("previewZoomValue"),
       exportSize: $("exportSize"),
+      exportFormatMenu: $("exportFormatMenu"),
+      exportFormatList: $("exportFormatList"),
       download: $("download"),
+      downloadLabel: $("downloadLabel"),
       undo: $("undo"),
       redo: $("redo"),
       statusMessage: $("statusMessage"),
@@ -1730,7 +1883,8 @@
         els[key].value = state[key];
       });
 
-      updateFormatToggle(els.includeTime, includeTime);
+      updateFormatToggle(els.includeTime, state.includeTime);
+      updateFormatToggle(els.dateMarkers, state.dateMarkers);
       updateFormatToggle(els.labelBold, state.labelBold);
       updateFormatToggle(els.labelItalic, state.labelItalic);
       updateFormatToggle(els.labelFillNone, state.labelFillNone);
@@ -1881,6 +2035,31 @@
       return name === "hour" ? 2.5 : 1.5;
     }
 
+    function getDateMarkerFontSize(faceDiameter) {
+      return Math.max(12, faceDiameter * 0.062);
+    }
+
+    function getDateMarkerPositions(faceDiameter) {
+      const center = faceDiameter / 2;
+      const hourAngle = (((state.hour % 12) * 30) + (state.minute * 0.5) - 90) * Math.PI / 180;
+      const minuteAngle = ((state.minute * 6) - 90) * Math.PI / 180;
+
+      return [
+        {
+          type: "month",
+          text: `${state.hour}월`,
+          x: center + Math.cos(hourAngle) * (faceDiameter * (MONTH_MARKER_LENGTH_PERCENT / 100)),
+          y: center + Math.sin(hourAngle) * (faceDiameter * (MONTH_MARKER_LENGTH_PERCENT / 100))
+        },
+        {
+          type: "day",
+          text: `${state.minute}일`,
+          x: center + Math.cos(minuteAngle) * (faceDiameter * (MINUTE_HAND_LENGTH_PERCENT / 100)),
+          y: center + Math.sin(minuteAngle) * (faceDiameter * (MINUTE_HAND_LENGTH_PERCENT / 100))
+        }
+      ];
+    }
+
     function render() {
       const theme = themes[state.theme];
 
@@ -1888,6 +2067,7 @@
       els.clock.innerHTML = "";
       updateRangeValues();
       updatePreviewZoom();
+      updateDownloadButtonText();
 
       els.clock.style.setProperty("--clock-size", `${DEFAULT_CLOCK_SIZE}%`);
       els.clock.style.setProperty("--ring-size", `${ringSize}%`);
@@ -1906,11 +2086,16 @@
       const face = document.createElement("div");
       face.className = "face";
       face.style.border = getRingBorder(theme);
+      face.style.setProperty("--clock-color", getClockColor());
       els.clock.appendChild(face);
 
       createCurvedLabel(els.clock);
       createTicks(face, theme);
-      createHands(face, theme);
+      if (state.dateMarkers) {
+        createDateMarkers(face);
+      } else {
+        createHands(face, theme);
+      }
 
       if (theme.centerDot) {
         createCenterDot(face, getClockColor());
@@ -1956,6 +2141,7 @@
 
     function bindImageDrag() {
       let drag = null;
+      let dragDepth = 0;
 
       els.canvas.addEventListener("pointerdown", event => {
         if (!state.imageUrl) return;
@@ -1974,6 +2160,43 @@
 
       els.canvas.addEventListener("dragstart", event => {
         event.preventDefault();
+      });
+
+      els.canvas.addEventListener("dragenter", event => {
+        if (!hasDataTransferImage(event.dataTransfer)) return;
+
+        event.preventDefault();
+        dragDepth += 1;
+        els.canvas.classList.add("is-drop-target");
+      });
+
+      els.canvas.addEventListener("dragover", event => {
+        if (!hasDataTransferImage(event.dataTransfer)) return;
+
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "copy";
+      });
+
+      els.canvas.addEventListener("dragleave", event => {
+        if (!hasDataTransferImage(event.dataTransfer)) return;
+
+        dragDepth = Math.max(0, dragDepth - 1);
+        if (dragDepth === 0) {
+          els.canvas.classList.remove("is-drop-target");
+        }
+      });
+
+      els.canvas.addEventListener("drop", event => {
+        const file = getDataTransferImageFile(event.dataTransfer);
+        if (!file) return;
+
+        event.preventDefault();
+        dragDepth = 0;
+        els.canvas.classList.remove("is-drop-target");
+        applyImageFile(file, {
+          notify: true,
+          message: "드롭한 이미지가 적용되었습니다."
+        });
       });
 
       els.canvas.addEventListener("pointermove", event => {
@@ -2105,6 +2328,17 @@
       createHand(parent, "minute", minuteAngle, MINUTE_HAND_LENGTH_PERCENT, theme);
     }
 
+    function createDateMarkers(parent) {
+      getDateMarkerPositions(100).forEach(marker => {
+        const element = document.createElement("div");
+        element.className = `date-marker date-marker-${marker.type}`;
+        element.textContent = marker.text;
+        element.style.left = `${marker.x}%`;
+        element.style.top = `${marker.y}%`;
+        parent.appendChild(element);
+      });
+    }
+
     function createHand(parent, name, angle, length, theme) {
       const handType = getHandType(theme);
       const hand = document.createElement("div");
@@ -2157,19 +2391,78 @@
       return escapeHTML(value).replace(/`/g, "&#096;");
     }
 
+    function isImageFile(file) {
+      const hasImageType = /^image\//i.test(file?.type || "");
+      const hasImageName = /\.(avif|bmp|gif|jpe?g|png|webp)$/i.test(file?.name || "");
+      return Boolean(file && (hasImageType || hasImageName));
+    }
+
+    function hasDataTransferImage(dataTransfer) {
+      const items = Array.from(dataTransfer?.items || []);
+      if (items.some(item => item.kind === "file" && /^image\//i.test(item.type || ""))) {
+        return true;
+      }
+
+      return Array.from(dataTransfer?.files || []).some(isImageFile);
+    }
+
+    function applyImageFile(file, options = {}) {
+      const { notify = false, message = "이미지가 적용되었습니다." } = options;
+      if (!isImageFile(file)) {
+        showStatus("이미지 파일을 찾지 못했습니다.", "error", 1800);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.addEventListener("load", () => {
+        pushUndoSnapshot();
+        state.imageUrl = reader.result;
+        state.imageMime = file.type || "";
+        els.file.value = "";
+        render();
+        updateImageControlRange();
+        saveSettings();
+        if (notify) {
+          showStatus(message, "info", 1600);
+        }
+      });
+      reader.addEventListener("error", () => {
+        showStatus("이미지를 불러오지 못했습니다.", "error", 2200);
+      });
+      reader.readAsDataURL(file);
+    }
+
+    function getDataTransferImageFile(dataTransfer) {
+      const items = Array.from(dataTransfer?.items || []);
+      const imageItem = items.find(item =>
+        item.kind === "file" && /^image\//i.test(item.type || "")
+      );
+      const itemFile = imageItem?.getAsFile();
+      if (isImageFile(itemFile)) return itemFile;
+
+      return Array.from(dataTransfer?.files || []).find(isImageFile) || null;
+    }
+
+    function getClipboardImageFile(event) {
+      return getDataTransferImageFile(event.clipboardData);
+    }
+
+    function handleClipboardPaste(event) {
+      const file = getClipboardImageFile(event);
+      if (!file) return;
+
+      event.preventDefault();
+      applyImageFile(file, {
+        notify: true,
+        message: "클립보드 이미지가 붙여넣어졌습니다."
+      });
+    }
+
     function bindControls() {
       els.file.addEventListener("change", event => {
         const file = event.target.files[0];
         if (!file) return;
-
-        const reader = new FileReader();
-        reader.addEventListener("load", () => {
-          pushUndoSnapshot();
-          state.imageUrl = reader.result;
-          render();
-          saveSettings();
-        });
-        reader.readAsDataURL(file);
+        applyImageFile(file);
       });
 
       populateTimePicker();
@@ -2194,6 +2487,7 @@
 
       [
         [els.includeTime, "includeTime"],
+        [els.dateMarkers, "dateMarkers"],
         [els.labelBold, "labelBold"],
         [els.labelItalic, "labelItalic"],
         [els.labelFillNone, "labelFillNone"],
@@ -2251,7 +2545,20 @@
         });
       });
 
-      els.download.addEventListener("click", downloadPng);
+      els.download.addEventListener("click", event => {
+        event.stopPropagation();
+        toggleExportFormatMenu();
+      });
+      els.exportFormatList.querySelectorAll("[data-export-format]").forEach(button => {
+        button.addEventListener("click", () => {
+          pushUndoSnapshot();
+          state.exportFormat = button.dataset.exportFormat;
+          closeExportFormatMenu();
+          render();
+          saveSettings({ notify: true });
+          downloadImage();
+        });
+      });
       els.undo.addEventListener("click", undoSettings);
       els.redo.addEventListener("click", redoSettings);
       els.exportSettings.addEventListener("click", exportSettingsJson);
@@ -2288,6 +2595,12 @@
       bindSectionOpenState(els.clockSection, "clockSectionOpen");
       bindSectionOpenState(els.textSection, "textSectionOpen");
       window.addEventListener("keydown", handleKeyboardShortcuts);
+      document.addEventListener("paste", handleClipboardPaste);
+      document.addEventListener("click", event => {
+        if (!els.exportFormatMenu.contains(event.target)) {
+          closeExportFormatMenu();
+        }
+      });
       window.addEventListener("resize", () => {
         if (window.matchMedia("(min-width: 761px)").matches) {
           closeSettingsDrawer();
@@ -2301,6 +2614,7 @@
     function handleKeyboardShortcuts(event) {
       if (event.key === "Escape") {
         closeSettingsDrawer();
+        closeExportFormatMenu();
         return;
       }
 
@@ -2310,7 +2624,7 @@
 
       if (key === "s") {
         event.preventDefault();
-        downloadPng();
+        downloadImage();
         return;
       }
 
@@ -2350,6 +2664,31 @@
       }
     }
 
+    async function downloadImage() {
+      if (isExporting) {
+        showStatus("저장 작업이 끝난 뒤 다시 시도하세요.", "error", 1800);
+        return;
+      }
+
+      isExporting = true;
+      closeExportFormatMenu();
+      updateDownloadBusyState();
+
+      try {
+        const format = getExportFormat();
+
+        if (format === "webm") {
+          await downloadWebm();
+          return;
+        }
+
+        await downloadPng();
+      } finally {
+        isExporting = false;
+        updateDownloadBusyState();
+      }
+    }
+
     async function downloadPng() {
       render();
       await waitForExportAssets();
@@ -2360,6 +2699,87 @@
       output.height = size;
 
       const context = output.getContext("2d");
+      drawExportScene(context, size);
+
+      const blob = await new Promise(resolve => output.toBlob(resolve, "image/png"));
+      if (!blob) {
+        showStatus("PNG 이미지를 만들지 못했습니다.", "error");
+        return;
+      }
+
+      const didSave = await saveBlob(blob, getPngFilename(), "PNG 이미지", "image/png", ".png");
+      if (didSave) {
+        showStatus("PNG 저장을 완료했습니다.");
+      }
+    }
+
+    async function downloadWebm() {
+      if (!HTMLCanvasElement.prototype.captureStream || !("MediaRecorder" in window)) {
+        showStatus("이 브라우저에서는 동영상 저장을 지원하지 않습니다.", "error");
+        return;
+      }
+
+      if (isGifImage() && !("ImageDecoder" in window)) {
+        showStatus("이 브라우저에서는 GIF 배경 동영상 저장을 지원하지 않습니다. Chrome 또는 Edge에서 다시 시도하세요.", "error");
+        return;
+      }
+
+      render();
+      await waitForExportAssets();
+      showStatus("동영상을 녹화하는 중입니다...");
+
+      try {
+        const size = Number(els.exportSize.value);
+        const output = document.createElement("canvas");
+        output.width = size;
+        output.height = size;
+        const context = output.getContext("2d");
+        const stream = output.captureStream(30);
+        const mimeType = getSupportedVideoMimeType();
+        const chunks = [];
+        const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+        const stopped = new Promise(resolve => {
+          recorder.addEventListener("stop", resolve, { once: true });
+        });
+
+        recorder.addEventListener("dataavailable", event => {
+          if (event.data?.size) chunks.push(event.data);
+        });
+
+        recorder.start();
+
+        if (isGifImage()) {
+          await forEachGifFrame(async ({ image, index, frameCount, durationUs, isLast }) => {
+            context.clearRect(0, 0, size, size);
+            drawExportScene(context, size, image);
+            const durationMs = Math.max(20, Math.round(durationUs / 1000));
+            await new Promise(resolve => setTimeout(resolve, durationMs));
+
+            if (index % 5 === 0 || isLast) {
+              showStatus(`동영상 녹화 중... ${index + 1}/${frameCount || "?"}`);
+            }
+          });
+        } else {
+          drawExportScene(context, size);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+
+        recorder.stop();
+        await stopped;
+        stream.getTracks().forEach(track => track.stop());
+
+        const blob = new Blob(chunks, { type: mimeType || "video/webm" });
+        const didSave = await saveBlob(blob, getWebmFilename(), "WEBM 동영상", "video/webm", ".webm");
+        if (didSave) {
+          showStatus("동영상 저장을 완료했습니다.");
+        }
+      } catch (error) {
+        console.error(error);
+        showStatus("동영상을 만들지 못했습니다.", "error");
+      }
+    }
+
+    function drawExportScene(context, size, backgroundImage = null) {
       const theme = themes[state.theme];
       const screenSize = $("canvas").getBoundingClientRect().width || size;
       const scale = size / screenSize;
@@ -2368,23 +2788,12 @@
       const clockDiameter = size * (DEFAULT_CLOCK_SIZE / 100);
       const ringRadius = clockDiameter * (RING_SIZE / 100) / 2;
 
-      drawExportBackground(context, size, scale);
+      drawExportBackground(context, size, scale, backgroundImage);
       drawExportOutsideMask(context, size, centerX, centerY, ringRadius);
       drawExportRing(context, theme, centerX, centerY, ringRadius, size);
       drawExportTicks(context, theme, centerX, centerY, ringRadius, size);
       drawExportHands(context, theme, centerX, centerY, ringRadius, size);
       drawExportLabel(context, centerX, centerY, clockDiameter);
-
-      const blob = await new Promise(resolve => output.toBlob(resolve, "image/png"));
-      if (!blob) {
-        showStatus("PNG 이미지를 만들지 못했습니다.", "error");
-        return;
-      }
-
-      const didSave = await savePngBlob(blob);
-      if (didSave) {
-        showStatus("PNG 저장을 완료했습니다.");
-      }
     }
 
     async function waitForExportAssets() {
@@ -2406,16 +2815,14 @@
       });
     }
 
-    async function savePngBlob(blob) {
-      const filename = getPngFilename();
-
+    async function saveBlob(blob, filename, description, mimeType, extension) {
       if ("showSaveFilePicker" in window) {
         try {
           const handle = await window.showSaveFilePicker({
             suggestedName: filename,
             types: [{
-              description: "PNG 이미지",
-              accept: { "image/png": [".png"] }
+              description,
+              accept: { [mimeType]: [extension] }
             }]
           });
           const writable = await handle.createWritable();
@@ -2432,13 +2839,19 @@
       const link = document.createElement("a");
       link.download = filename;
       link.href = url;
+      document.body.appendChild(link);
       link.click();
-      URL.revokeObjectURL(url);
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
       return true;
     }
 
-    function drawExportBackground(context, size, scale) {
-      if (!state.imageUrl || !els.bgImg.complete || !els.bgImg.naturalWidth) {
+    function drawExportBackground(context, size, scale, sourceImage = null) {
+      const image = sourceImage || els.bgImg;
+      const naturalWidth = image?.naturalWidth || image?.displayWidth || image?.videoWidth || image?.width || 0;
+      const naturalHeight = image?.naturalHeight || image?.displayHeight || image?.videoHeight || image?.height || 0;
+
+      if (!sourceImage && (!state.imageUrl || !els.bgImg.complete || !els.bgImg.naturalWidth)) {
         const gradient = context.createLinearGradient(0, 0, size, size);
         gradient.addColorStop(0, "#642020");
         gradient.addColorStop(1, "#2d2d2d");
@@ -2447,11 +2860,15 @@
         return;
       }
 
-      const image = els.bgImg;
-      const coverScale = Math.max(size / image.naturalWidth, size / image.naturalHeight);
-      const imageScale = coverScale * (state.imageScale / 100);
-      const width = image.naturalWidth * imageScale;
-      const height = image.naturalHeight * imageScale;
+      if (!naturalWidth || !naturalHeight) return;
+
+      context.fillStyle = "#333333";
+      context.fillRect(0, 0, size, size);
+
+      const containScale = Math.min(size / naturalWidth, size / naturalHeight);
+      const imageScale = containScale * (state.imageScale / 100);
+      const width = naturalWidth * imageScale;
+      const height = naturalHeight * imageScale;
       const x = ((size - width) / 2) + (state.imageX * scale);
       const y = ((size - height) / 2) + (state.imageY * scale);
 
@@ -2535,6 +2952,21 @@
     }
 
     function drawExportHands(context, theme, centerX, centerY, radius, size) {
+      if (state.dateMarkers) {
+        drawExportDateMarkers(context, centerX, centerY, radius);
+
+        if (theme.centerDot) {
+          context.save();
+          context.fillStyle = getClockColor();
+          context.beginPath();
+          context.arc(centerX, centerY, radius * 2 * (CENTER_DOT_SIZE_PERCENT / 100) / 2, 0, Math.PI * 2);
+          context.fill();
+          context.restore();
+        }
+
+        return;
+      }
+
       const hourAngle = (((state.hour % 12) * 30) + (state.minute * 0.5) - 90) * Math.PI / 180;
       const minuteAngle = ((state.minute * 6) - 90) * Math.PI / 180;
 
@@ -2566,6 +2998,29 @@
         context.fill();
         context.restore();
       }
+    }
+
+    function drawExportDateMarkers(context, centerX, centerY, radius) {
+      const faceDiameter = radius * 2;
+      const fontSize = getDateMarkerFontSize(faceDiameter);
+
+      context.save();
+      context.font = `900 ${fontSize}px Pretendard, "Noto Sans KR", sans-serif`;
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.lineJoin = "round";
+      context.lineWidth = Math.max(2, fontSize * 0.14);
+      context.strokeStyle = "rgba(0, 0, 0, 0.72)";
+      context.fillStyle = getClockColor();
+
+      getDateMarkerPositions(faceDiameter).forEach(marker => {
+        const x = centerX - radius + marker.x;
+        const y = centerY - radius + marker.y;
+        context.strokeText(marker.text, x, y);
+        context.fillText(marker.text, x, y);
+      });
+
+      context.restore();
     }
 
     function drawExportHand(context, theme, centerX, centerY, length, angle, width) {
@@ -2643,6 +3098,196 @@
       context.restore();
     }
 
+    function isGifImage() {
+      return /^data:image\/gif/i.test(state.imageUrl || "") || state.imageMime === "image/gif";
+    }
+
+    function updateDownloadButtonText() {
+      const labels = {
+        png: "PNG 저장",
+        webm: "WEBM 저장"
+      };
+
+      const format = getExportFormat();
+      els.downloadLabel.textContent = labels[format] || labels.png;
+      els.exportFormatList.querySelectorAll("[data-export-format]").forEach(button => {
+        button.setAttribute("aria-checked", String(button.dataset.exportFormat === format));
+      });
+    }
+
+    function getExportFormat() {
+      if (state.exportFormat === "webm") return "webm";
+      if (state.exportFormat !== "png") {
+        state.exportFormat = "png";
+      }
+      return "png";
+    }
+
+    function updateDownloadBusyState() {
+      els.download.disabled = isExporting;
+      els.download.setAttribute("aria-busy", String(isExporting));
+      els.exportFormatList.querySelectorAll("[data-export-format]").forEach(button => {
+        button.disabled = isExporting;
+      });
+    }
+
+    function toggleExportFormatMenu() {
+      if (isExporting) {
+        showStatus("저장 작업이 끝난 뒤 다시 시도하세요.", "error", 1800);
+        return;
+      }
+
+      const willOpen = els.exportFormatList.hidden;
+      els.exportFormatList.hidden = !willOpen;
+      els.download.setAttribute("aria-expanded", String(willOpen));
+    }
+
+    function closeExportFormatMenu() {
+      els.exportFormatList.hidden = true;
+      els.download.setAttribute("aria-expanded", "false");
+    }
+
+    function getSupportedVideoMimeType() {
+      const types = [
+        "video/webm;codecs=vp9",
+        "video/webm;codecs=vp8",
+        "video/webm"
+      ];
+
+      return types.find(type => MediaRecorder.isTypeSupported(type)) || "";
+    }
+
+    function dataUrlToBytes(dataUrl) {
+      const commaIndex = dataUrl.indexOf(",");
+      const header = dataUrl.slice(0, commaIndex);
+      const payload = dataUrl.slice(commaIndex + 1);
+
+      if (/;base64/i.test(header)) {
+        const binary = atob(payload);
+        const bytes = new Uint8Array(binary.length);
+        for (let index = 0; index < binary.length; index++) {
+          bytes[index] = binary.charCodeAt(index);
+        }
+        return bytes;
+      }
+
+      return new TextEncoder().encode(decodeURIComponent(payload));
+    }
+
+    async function forEachGifFrame(callback) {
+      const source = dataUrlToBytes(state.imageUrl);
+      const gifInfo = parseGifFrameInfo(source);
+      const decoder = new ImageDecoder({ data: source, type: "image/gif" });
+      await decoder.tracks.ready;
+
+      const decodedTrack = decoder.tracks.selectedTrack;
+      const decoderFrameCount = Number.isFinite(decodedTrack?.frameCount) && decodedTrack.frameCount > 0
+        ? decodedTrack.frameCount
+        : 0;
+      const knownFrameCount = gifInfo.frameCount || decoderFrameCount || 1;
+
+      try {
+        for (let index = 0; index < knownFrameCount; index++) {
+          const result = await decoder.decode({ frameIndex: index });
+          const isLast = index === knownFrameCount - 1;
+          const durationUs = gifInfo.delays[index] || result.image.duration || 100000;
+
+          try {
+            await callback({
+              image: result.image,
+              index,
+              frameCount: knownFrameCount,
+              durationUs,
+              isLast
+            });
+          } finally {
+            result.image.close?.();
+          }
+        }
+      } finally {
+        await decoder.close?.();
+      }
+    }
+
+    function parseGifFrameInfo(bytes) {
+      const info = {
+        frameCount: 0,
+        delays: []
+      };
+
+      if (
+        bytes.length < 13 ||
+        bytes[0] !== 0x47 ||
+        bytes[1] !== 0x49 ||
+        bytes[2] !== 0x46
+      ) {
+        return info;
+      }
+
+      let offset = 10;
+      const packed = bytes[offset];
+      offset += 3;
+
+      if (packed & 0x80) {
+        offset += 3 * (1 << ((packed & 0x07) + 1));
+      }
+
+      let pendingDelayCs = 10;
+
+      while (offset < bytes.length) {
+        const block = bytes[offset++];
+
+        if (block === 0x3b) break;
+
+        if (block === 0x21) {
+          const label = bytes[offset++];
+
+          if (label === 0xf9 && bytes[offset] === 4) {
+            offset++;
+            offset++;
+            pendingDelayCs = bytes[offset] | (bytes[offset + 1] << 8);
+            offset += 2;
+            offset += 2;
+            continue;
+          }
+
+          offset = skipGifSubBlocks(bytes, offset);
+          continue;
+        }
+
+        if (block === 0x2c) {
+          if (offset + 9 > bytes.length) break;
+          const imagePacked = bytes[offset + 8];
+          offset += 9;
+
+          if (imagePacked & 0x80) {
+            offset += 3 * (1 << ((imagePacked & 0x07) + 1));
+          }
+
+          offset++;
+          offset = skipGifSubBlocks(bytes, offset);
+          info.frameCount++;
+          info.delays.push(Math.max(2, pendingDelayCs || 10) * 10000);
+          pendingDelayCs = 10;
+          continue;
+        }
+
+        break;
+      }
+
+      return info;
+    }
+
+    function skipGifSubBlocks(bytes, offset) {
+      while (offset < bytes.length) {
+        const size = bytes[offset++];
+        if (size === 0) break;
+        offset += size;
+      }
+
+      return offset;
+    }
+
     function getLabelText() {
       if (!state.includeTime) return state.labelText;
       return `${formatTime()} ${state.labelText}`;
@@ -2694,6 +3339,11 @@
     function getPngFilename() {
       const label = sanitizeFilenamePart(state.labelText || getLabelText());
       return `${label}_${formatTimestamp()}.png`;
+    }
+
+    function getWebmFilename() {
+      const label = sanitizeFilenamePart(state.labelText || getLabelText());
+      return `${label}_${formatTimestamp()}.webm`;
     }
 
     async function initialize() {
