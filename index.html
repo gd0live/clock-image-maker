@@ -1125,23 +1125,38 @@
       }
 
       .editor-menubar {
-        flex-wrap: wrap;
-        height: auto;
-        min-height: 34px;
-        padding: 4px 6px;
-        overflow-x: visible;
+        flex-wrap: nowrap;
+        justify-content: center;
+        gap: 6px;
+        height: 36px;
+        min-height: 36px;
+        padding: 0 8px;
+        overflow-x: auto;
       }
 
       .editor-menu-button {
-        flex: 1 1 calc(33.333% - 4px);
-        min-width: 86px;
+        flex: 0 0 32px;
+        width: 32px;
+        min-width: 32px;
         max-width: none;
-        padding: 0 6px;
+        padding: 0;
       }
 
       .editor-menu-button svg {
-        width: 15px;
-        height: 15px;
+        width: 17px;
+        height: 17px;
+      }
+
+      .editor-menu-button span {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
       }
 
       .preview {
@@ -2993,6 +3008,19 @@
       els.menuToggle.setAttribute("aria-label", isOpen ? "설정 닫기" : "설정 열기");
       els.menuToggleIcon.textContent = isOpen ? "<" : ">";
       document.body.classList.toggle("drawer-open", isOpen);
+      updatePreviewControlState();
+    }
+
+    function isMobileSettingsDrawerOpen() {
+      return window.matchMedia("(max-width: 760px)").matches &&
+        els.settingsPanel.classList.contains("is-open");
+    }
+
+    function updatePreviewControlState() {
+      const disabled = isMobileSettingsDrawerOpen();
+      els.previewFit.disabled = disabled;
+      els.previewZoom.disabled = disabled;
+      els.previewFit.setAttribute("aria-disabled", String(disabled));
     }
 
     function toggleSettingsDrawer() {
@@ -3920,6 +3948,7 @@
         if (file) importSettingsJson(file);
       });
       els.previewFit.addEventListener("click", () => {
+        if (els.previewFit.disabled) return;
         state.previewZoom = "fit";
         updatePreviewZoom();
         updateImageControlRange();
@@ -3927,6 +3956,7 @@
         saveSettings();
       });
       els.previewZoom.addEventListener("input", event => {
+        if (els.previewZoom.disabled) return;
         state.previewZoom = Number(event.target.value);
         updatePreviewZoom();
         updateImageControlRange();
@@ -3960,6 +3990,7 @@
         if (window.matchMedia("(min-width: 761px)").matches) {
           closeSettingsDrawer();
         }
+        updatePreviewControlState();
         updateImageControlRange();
         render();
       });
@@ -4915,6 +4946,7 @@
       updateImageControlRange();
       bindControls();
       render();
+      updatePreviewControlState();
       updateHistoryButtons();
     }
 
