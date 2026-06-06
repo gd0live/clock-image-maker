@@ -4438,22 +4438,29 @@
     }
 
     function drawExportOutsideMask(context, size, centerX, centerY, radius) {
-      context.save();
-      context.globalAlpha = state.outsideOpacity;
-      context.beginPath();
-      context.rect(0, 0, size, size);
-      context.arc(centerX, centerY, radius, 0, Math.PI * 2);
-      context.clip("evenodd");
+      const maskCanvas = document.createElement("canvas");
+      maskCanvas.width = size;
+      maskCanvas.height = size;
+      const maskContext = maskCanvas.getContext("2d");
+      if (!maskContext) return;
 
       if (state.outsideMode === "color") {
-        context.fillStyle = state.outsideColor;
-        context.fillRect(0, 0, size, size);
+        maskContext.fillStyle = state.outsideColor;
+        maskContext.fillRect(0, 0, size, size);
       }
 
       if (state.outsideMode === "image" && state.outsideImageUrl && els.outsideBgImg.complete && els.outsideBgImg.naturalWidth) {
-        drawExportOutsideImage(context, size);
+        drawExportOutsideImage(maskContext, size);
       }
 
+      maskContext.globalCompositeOperation = "destination-out";
+      maskContext.beginPath();
+      maskContext.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      maskContext.fill();
+
+      context.save();
+      context.globalAlpha = state.outsideOpacity;
+      context.drawImage(maskCanvas, 0, 0);
       context.restore();
     }
 
@@ -4463,12 +4470,11 @@
       const naturalHeight = image.naturalHeight || image.height || 0;
       if (!naturalWidth || !naturalHeight) return;
 
-      const fitScale = Math.max(size / naturalWidth, size / naturalHeight);
-      const imageScale = fitScale * (state.outsideImageScale / 100);
-      const width = naturalWidth * imageScale;
-      const height = naturalHeight * imageScale;
-      const x = ((size - width) / 2) + positionPercentToPx(state.outsideImageX, size);
-      const y = ((size - height) / 2) + positionPercentToPx(state.outsideImageY, size);
+      const imageScale = state.outsideImageScale / 100;
+      const width = size * imageScale;
+      const height = size * imageScale;
+      const x = (size - width) * (0.5 + ((Number(state.outsideImageX) || 0) / 100));
+      const y = (size - height) * (0.5 + ((Number(state.outsideImageY) || 0) / 100));
 
       context.drawImage(image, x, y, width, height);
     }
